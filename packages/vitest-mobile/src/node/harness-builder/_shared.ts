@@ -18,7 +18,7 @@ export const DEFAULT_BUILD_TIMEOUT = 30 * 60 * 1000; // 30 minutes
 
 export interface HarnessBuildOptions {
   platform: Platform;
-  /** React Native version (e.g. '0.81.5'). Auto-detected if not specified. */
+  /** React Native version (e.g. '0.86.0'). Auto-detected if not specified. */
   reactNativeVersion: string;
   /** Additional native modules to include (e.g. ['react-native-reanimated']). */
   nativeModules: string[];

@@ -65,8 +65,7 @@
     "test": "vitest run tests/unit tests/integration",
     "test:unit": "vitest run tests/unit",
     "test:e2e": "vitest run --config vitest.config.e2e.ts",
-    "prepublishOnly": "npm run build",
-    "prepack": "cp ../../README.md ."
+    "prepublishOnly": "bun run build && cp ../../README.md ."
   },
   "keywords": [
     "vitest",
@@ -97,7 +96,7 @@
     "@vitest/runner": "^4.0.0",
     "@vitest/utils": "^4.0.0",
     "react": ">=18",
-    "react-native": ">=0.81.5",
+    "react-native": ">=0.86.0",
     "vitest": "^4.0.0"
   },
   "devDependencies": {

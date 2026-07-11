@@ -127,7 +127,7 @@ export function resolveHarness(
     throw new Error(
       'Could not auto-detect React Native version (react-native not found in node_modules).\n' +
         'Either install react-native or set reactNativeVersion explicitly in your Vitest config:\n\n' +
-        "  nativePlugin({ harness: { reactNativeVersion: '0.81.5' } })",
+        "  nativePlugin({ harness: { reactNativeVersion: '0.86.0' } })",
     );
   }
   log.info(`React Native version: ${rnVersion}`);

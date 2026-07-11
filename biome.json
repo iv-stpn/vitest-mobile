@@ -1,0 +1,17 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "extends": ["@iv-stpn/biome-config/biome"],
+  "files": {
+    "ignoreUnknown": true,
+    "includes": [
+      "!**/dist",
+      "!**/node_modules",
+      "!**/.next",
+      "!**/.tsc-out",
+      "!**/docs/src/markdoc",
+      "!**/docs-fetchium/src/markdoc",
+      "!**/__fixtures__",
+      "!**/fixtures"
+    ]
+  }
+}

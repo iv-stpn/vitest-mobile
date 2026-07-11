@@ -152,7 +152,7 @@ describe('nativePlugin', () => {
   it('passes nested device/harness/metro groups through to the pool', () => {
     const plugin = nativePlugin({
       device: { preferredDeviceId: 'iPhone 15', headless: true },
-      harness: { reactNativeVersion: '0.81.5', nativeModules: ['react-native-reanimated'] },
+      harness: { reactNativeVersion: '0.86.0', nativeModules: ['react-native-reanimated'] },
       metro: { bundle: true },
     });
     const { projectConfig: cfg } = runConfigure(plugin);
@@ -160,7 +160,7 @@ describe('nativePlugin', () => {
     const { options } = lastCall();
     expect(options.device).toMatchObject({ preferredDeviceId: 'iPhone 15', headless: true });
     expect(options.harness).toMatchObject({
-      reactNativeVersion: '0.81.5',
+      reactNativeVersion: '0.86.0',
       nativeModules: ['react-native-reanimated'],
     });
     expect(options.metro).toMatchObject({ bundle: true });

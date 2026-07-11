@@ -16,12 +16,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-      - run: npm ci
-      - run: npm run build --workspace=packages/vitest-mobile
-      - run: npm run lint
-      - run: npm run check-types
-      - run: npm run format:check
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run --filter vitest-mobile build
+      - run: bun run lint
+      - run: bun run check-types
+      - run: bun run format:check
 
   # ── Unit + integration tests ───────────────────────────────────────────────
   unit-tests:
@@ -32,9 +32,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-      - run: npm ci
-      - run: npm test
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run test
         working-directory: packages/vitest-mobile
 
   # ── E2E: Android (cached) ──────────────────────────────────────────────────
@@ -46,21 +46,21 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
+      - uses: oven-sh/setup-bun@v2
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
 
       - name: Install dependencies
-        run: npm ci
+        run: bun install --frozen-lockfile
 
       - name: Build package
-        run: npm run build --workspace=packages/vitest-mobile
+        run: bun run --filter vitest-mobile build
 
       - name: Compute cache key
         id: cache-key
-        run: echo "key=android-e2e-$(npx vitest-mobile cache-key --platform android)" >> "$GITHUB_OUTPUT"
+        run: echo "key=android-e2e-$(bunx vitest-mobile cache-key --platform android)" >> "$GITHUB_OUTPUT"
 
       - name: Restore cache
         uses: actions/cache/restore@v4
@@ -78,13 +78,13 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Build, boot & install
-        run: npx vitest-mobile bootstrap --platform android --headless --api-level 35
+        run: bunx vitest-mobile bootstrap --platform android --headless --api-level 35
 
       - name: Pre-build JS bundle
-        run: npx vitest-mobile bundle --platform android
+        run: bunx vitest-mobile bundle --platform android
 
       - name: Run E2E tests
-        run: npx vitest run --project android
+        run: bunx vitest run --project android
 
       - name: Upload logs on failure
         if: failure()
@@ -112,17 +112,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
+      - uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
-        run: npm ci
+        run: bun install --frozen-lockfile
 
       - name: Build package
-        run: npm run build --workspace=packages/vitest-mobile
+        run: bun run --filter vitest-mobile build
 
       - name: Compute cache key
         id: cache-key
-        run: echo "key=ios-e2e-$(npx vitest-mobile cache-key --platform ios)" >> "$GITHUB_OUTPUT"
+        run: echo "key=ios-e2e-$(bunx vitest-mobile cache-key --platform ios)" >> "$GITHUB_OUTPUT"
 
       - name: Restore cache
         uses: actions/cache/restore@v4
@@ -132,13 +132,13 @@ jobs:
           restore-keys: ios-e2e-
 
       - name: Build, boot & install
-        run: npx vitest-mobile bootstrap --platform ios --headless
+        run: bunx vitest-mobile bootstrap --platform ios --headless
 
       - name: Pre-build JS bundle
-        run: npx vitest-mobile bundle --platform ios
+        run: bunx vitest-mobile bundle --platform ios
 
       - name: Run E2E tests
-        run: npx vitest run --project ios
+        run: bunx vitest run --project ios
 
       - name: Upload logs on failure
         if: failure()
@@ -165,17 +165,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
+      - uses: oven-sh/setup-bun@v2
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
 
       - name: Install dependencies
-        run: npm ci
+        run: bun install --frozen-lockfile
 
       - name: Build package
-        run: npm run build --workspace=packages/vitest-mobile
+        run: bun run --filter vitest-mobile build
 
       - name: Enable KVM
         run: |
@@ -184,13 +184,13 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Build, boot & install
-        run: npx vitest-mobile bootstrap --platform android --headless --force --api-level 35
+        run: bunx vitest-mobile bootstrap --platform android --headless --force --api-level 35
 
       - name: Pre-build JS bundle
-        run: npx vitest-mobile bundle --platform android
+        run: bunx vitest-mobile bundle --platform android
 
       - name: Run E2E tests
-        run: npx vitest run --project android
+        run: bunx vitest run --project android
 
       - name: Upload logs on failure
         if: failure()
@@ -210,22 +210,22 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
+      - uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
-        run: npm ci
+        run: bun install --frozen-lockfile
 
       - name: Build package
-        run: npm run build --workspace=packages/vitest-mobile
+        run: bun run --filter vitest-mobile build
 
       - name: Build, boot & install
-        run: npx vitest-mobile bootstrap --platform ios --headless --force
+        run: bunx vitest-mobile bootstrap --platform ios --headless --force
 
       - name: Pre-build JS bundle
-        run: npx vitest-mobile bundle --platform ios
+        run: bunx vitest-mobile bundle --platform ios
 
       - name: Run E2E tests
-        run: npx vitest run --project ios
+        run: bunx vitest run --project ios
 
       - name: Upload logs on failure
         if: failure()

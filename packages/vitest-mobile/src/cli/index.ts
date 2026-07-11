@@ -304,7 +304,7 @@ cli
         'Could not auto-detect React Native version (react-native not found in node_modules).\n' +
           'Install react-native first:\n  npm install react-native\n\n' +
           'Or set reactNativeVersion explicitly in your Vitest config:\n' +
-          "  nativePlugin({ reactNativeVersion: '0.81.5' })",
+          "  nativePlugin({ reactNativeVersion: '0.86.0' })",
       );
       process.exit(1);
     }

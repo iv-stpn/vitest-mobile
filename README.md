@@ -1,10 +1,13 @@
 # vitest-mobile
 
-Run Vitest component tests inside a real React Native app. Tests execute using real native views and real touch events, not mocked renderers or simulated interactions.
+Run Vitest component tests inside a real React Native app. Tests execute using
+real native views and real touch events, not mocked renderers or simulated
+interactions.
 
 ![vitest-mobile demo](./demo.webp)
 
-The pool boots an emulator/simulator, launches a React Native app, connects over WebSocket, and sends test files to run.
+The pool boots an emulator/simulator, launches a React Native app, connects over
+WebSocket, and sends test files to run.
 
 ## Table of Contents
 
@@ -27,7 +30,7 @@ The pool boots an emulator/simulator, launches a React Native app, connects over
 | Android SDK  | API 35       | Android only — includes `adb`, `avdmanager`       |
 | Java         | 17 (Temurin) | Android only                                      |
 | Vitest       | ^4.0         | Peer dependency                                   |
-| React Native | >= 0.81.5    | New Architecture (Fabric + TurboModules) required |
+| React Native | >= 0.86.0    | New Architecture (Fabric + TurboModules) required |
 
 ## Quick Start
 
@@ -40,24 +43,24 @@ npm install vitest-mobile
 Create a `vitest.config.ts` at the root of your project with the `nativePlugin`:
 
 ```typescript
-import { defineConfig } from 'vitest/config';
-import { nativePlugin } from 'vitest-mobile';
+import { defineConfig } from "vitest/config";
+import { nativePlugin } from "vitest-mobile";
 
 export default defineConfig({
   test: {
     projects: [
       {
-        plugins: [nativePlugin({ platform: 'ios' })],
+        plugins: [nativePlugin({ platform: "ios" })],
         test: {
-          name: 'ios',
-          include: ['test-packages/**/tests/**/*.test.tsx'],
+          name: "ios",
+          include: ["test-packages/**/tests/**/*.test.tsx"],
         },
       },
       {
-        plugins: [nativePlugin({ platform: 'android' })],
+        plugins: [nativePlugin({ platform: "android" })],
         test: {
-          name: 'android',
-          include: ['test-packages/**/tests/**/*.test.tsx'],
+          name: "android",
+          include: ["test-packages/**/tests/**/*.test.tsx"],
         },
       },
     ],
@@ -85,28 +88,29 @@ npx vitest run --project android
 
 ## Writing Tests
 
-Tests look like standard Vitest tests, but use `vitest-mobile/runtime` for rendering into real native views:
+Tests look like standard Vitest tests, but use `vitest-mobile/runtime` for
+rendering into real native views:
 
 ```tsx
-import React from 'react';
-import { describe, it, expect, afterEach } from 'vitest';
-import { render, cleanup, waitFor } from 'vitest-mobile/runtime';
-import { CounterModule } from '../CounterModule';
+import React from "react";
+import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, render, waitFor } from "vitest-mobile/runtime";
+import { CounterModule } from "../CounterModule";
 
 afterEach(async () => {
   await cleanup();
 });
 
-describe('CounterModule', () => {
-  it('renders initial count of zero', async () => {
+describe("CounterModule", () => {
+  it("renders initial count of zero", async () => {
     const screen = await render(<CounterModule userId="123" />);
-    await expect.element(screen.getByTestId('count-display')).toHaveText('0');
+    await expect.element(screen.getByTestId("count-display")).toHaveText("0");
   });
 
-  it('increments on press', async () => {
+  it("increments on press", async () => {
     const screen = await render(<CounterModule userId="123" />);
-    await screen.getByTestId('increment-btn').tap();
-    await expect.element(screen.getByTestId('count-display')).toHaveText('1');
+    await screen.getByTestId("increment-btn").tap();
+    await expect.element(screen.getByTestId("count-display")).toHaveText("1");
   });
 });
 ```
@@ -116,7 +120,13 @@ describe('CounterModule', () => {
 ### Rendering
 
 ```typescript
-import { render, cleanup, waitFor, screenshot, pause } from 'vitest-mobile/runtime';
+import {
+  cleanup,
+  pause,
+  render,
+  screenshot,
+  waitFor,
+} from "vitest-mobile/runtime";
 ```
 
 | Function                         | Description                                                                         |
@@ -160,7 +170,7 @@ import { render, cleanup, waitFor, screenshot, pause } from 'vitest-mobile/runti
 Use `expect.element(locator)` for automatic retrying:
 
 ```tsx
-await expect.element(screen.getByTestId('count')).toHaveText('1');
+await expect.element(screen.getByTestId("count")).toHaveText("1");
 ```
 
 ## CLI Reference
@@ -290,7 +300,9 @@ jobs:
 
 #### Adding Build Caching
 
-To avoid rebuilding the native binary on every CI run, cache the `~/.cache/vitest-mobile` directory. The `cache-key` command generates a deterministic key:
+To avoid rebuilding the native binary on every CI run, cache the
+`~/.cache/vitest-mobile` directory. The `cache-key` command generates a
+deterministic key:
 
 ```yaml
 - name: Compute cache key
@@ -323,7 +335,8 @@ path: |
 
 ### "Requiring unknown module NNN"
 
-Module code is not in the bundle. Caused by lazy bundling or missing static dependencies. Try clearing the Metro cache:
+Module code is not in the bundle. Caused by lazy bundling or missing static
+dependencies. Try clearing the Metro cache:
 
 ```bash
 npx expo start --dev-client --clear
@@ -331,14 +344,17 @@ npx expo start --dev-client --clear
 
 ### "Vitest failed to find the current suite"
 
-`describe()`/`it()` called without runner context. The babel plugin should prevent this. Check:
+`describe()`/`it()` called without runner context. The babel plugin should
+prevent this. Check:
 
 1. Clear Metro cache
-2. Verify the test file is being transformed (check for `exports.__run` in the bundled output)
+2. Verify the test file is being transformed (check for `exports.__run` in the
+   bundled output)
 
 ### App crashes on reload
 
-The dev client sometimes serves a 1-module bundle. Workaround — terminate and relaunch:
+The dev client sometimes serves a 1-module bundle. Workaround — terminate and
+relaunch:
 
 ```bash
 xcrun simctl terminate booted com.vitest.mobile.harness
