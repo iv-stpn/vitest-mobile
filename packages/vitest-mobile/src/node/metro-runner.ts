@@ -313,7 +313,7 @@ export async function startMetroServer(
     ...(devMiddleware ? { unstable_extraMiddleware: [devMiddleware] } : {}),
     ...(websocketEndpoints ? { websocketEndpoints } : {}),
   } as RunServerOptions;
-  const { httpServer } = await metro.runServer(configWithFileReporter, runServerOpts);
+  const httpServer = await metro.runServer(configWithFileReporter, runServerOpts);
 
   // Track keep-alive TCP connections so we can forcibly destroy them on
   // close. `httpServer.close()` only waits for idle sockets; without this,
@@ -778,7 +778,7 @@ function applyTestTransforms(
   // Serve /status for RCTBundleURLProvider's packager-running check
   type EnhanceMiddleware = ConfigT['server']['enhanceMiddleware'];
   const origEnhance = config.server.enhanceMiddleware;
-  const enhanceMiddleware: EnhanceMiddleware = (middleware, metroServer) => {
+  const enhanceMiddleware: NonNullable<EnhanceMiddleware> = (middleware, metroServer) => {
     const enhanced = origEnhance ? origEnhance(middleware, metroServer) : middleware;
     return ((req: connect.IncomingMessage, res: import('http').ServerResponse, next: connect.NextFunction) => {
       if (req.url === '/status') {
