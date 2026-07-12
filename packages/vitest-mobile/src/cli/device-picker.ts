@@ -21,7 +21,7 @@
 
 import { isCancel, select } from '@clack/prompts';
 import { getBootedSimulators, listAllIOSSimulators, primarySimulatorName } from '../node/device/ios';
-import { listAllAvds, avdNameForProject, hasAvdProvisioningTools } from '../node/device/android';
+import { listAllAvds, avdNameForProject, hasAvdProvisioningTools, getAvdAbi, HOST_AVD_ARCH } from '../node/device/android';
 import { getDeviceMapping, setDeviceMapping, type DeviceMapping } from '../node/device/mapping';
 import type { Platform } from '../node/types';
 
@@ -104,8 +104,15 @@ async function pickAndroid(appDir: string, currentChoice?: string): Promise<Pick
   const canCreate = hasAvdProvisioningTools();
 
   const existingAvds = avds
-    .filter(a => (!a.startsWith('vitest-mobile-') && a !== 'vitest-mobile') || a === projectAvd)
-    .sort()
+    // Keep only AVDs that belong to this project (filter other vitest-mobile-* ones out)
+    // and whose ABI matches the host CPU. AVDs with an unreadable ABI are kept (fail open).
+    .filter(a => {
+      if (a.startsWith('vitest-mobile-') && a !== projectAvd) return false;
+      if (a === 'vitest-mobile' && a !== projectAvd) return false;
+      const abi = getAvdAbi(a);
+      return abi === null || abi === HOST_AVD_ARCH;
+    })
+    .sort((a, b) => a.localeCompare(b))
     .map(a => ({ value: a, label: a }));
 
   const createHint = canCreate ? undefined : 'requires Android cmdline-tools (sdkmanager + avdmanager)';

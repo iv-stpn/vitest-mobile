@@ -5,6 +5,7 @@
 import { execSync, spawn, type ExecSyncOptions } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { arch as osArch, homedir } from 'node:os';
 import { resolve } from 'node:path';
 import { log } from '../logger';
 import { run, getAndroidHome, getAdbPath } from '../exec-utils';
@@ -156,8 +157,51 @@ function pickEmulatorConsolePort(excludeSerials: string[]): number {
 // ── Auto-provisioning ────────────────────────────────────────────
 
 const DEFAULT_API_LEVEL = 35;
-const DEFAULT_ARCH = 'x86_64';
-const DEFAULT_TARGET = 'default';
+// arm64-v8a on Apple Silicon / aarch64 hosts; x86_64 elsewhere.
+// QEMU2 cannot emulate a foreign CPU architecture, so the image ABI must match the host.
+const DEFAULT_ARCH = osArch() === 'arm64' ? 'arm64-v8a' : 'x86_64';
+// ARM images are distributed under the google_apis target; x86_64 images use default.
+const DEFAULT_TARGET = osArch() === 'arm64' ? 'google_apis' : 'default';
+
+/** The ABI required by the host CPU — used by the AVD picker to filter incompatible devices. */
+export const HOST_AVD_ARCH = DEFAULT_ARCH;
+
+const DATA_PARTITION_RE = /^disk\.dataPartition\.size\s*=\s*.+$/m;
+const AVD_INI_PATH_RE = /^path\s*=\s*(.+)$/m;
+const AVD_ABI_RE = /^abi\.type\s*=\s*(.+)$/m;
+
+/**
+ * Read the `abi.type` field from an AVD's config.ini.
+ *
+ * The emulator can list AVDs from both the vitest-mobile cache dir and the
+ * standard `~/.android/avd` home. This function checks both locations so the
+ * picker can filter out AVDs whose CPU architecture can't run on the host.
+ *
+ * Returns null if the AVD can't be found or its config can't be read — in that
+ * case the caller should not exclude the AVD (fail open rather than fail closed).
+ */
+function readAvdAbiFromDir(avdName: string, dir: string): string | null {
+  const iniPath = resolve(dir, `${avdName}.ini`);
+  if (!existsSync(iniPath)) return null;
+  try {
+    const avdPath = readFileSync(iniPath, 'utf8').match(AVD_INI_PATH_RE)?.[1]?.trim();
+    if (!avdPath) return null;
+    const configPath = resolve(avdPath, 'config.ini');
+    if (!existsSync(configPath)) return null;
+    return readFileSync(configPath, 'utf8').match(AVD_ABI_RE)?.[1]?.trim() ?? null;
+  } catch {
+    return null; // unreadable — skip
+  }
+}
+
+export function getAvdAbi(avdName: string): string | null {
+  const searchDirs = [avdHome(), resolve(homedir(), '.android', 'avd')];
+  for (const dir of searchDirs) {
+    const abi = readAvdAbiFromDir(avdName, dir);
+    if (abi) return abi;
+  }
+  return null;
+}
 
 /**
  * AVD naming.
@@ -275,10 +319,31 @@ function avdHome(): string {
   return resolve(getCacheDir(), 'avd');
 }
 
+/**
+ * Reduce the data partition size in an AVD's config.ini.
+ *
+ * avdmanager hard-codes `disk.dataPartition.size = 6442450944` (6 GB).
+ * On machines with limited free disk the emulator refuses to start.
+ * Overwrite it with 2 GB — plenty for test workloads.
+ */
+function patchAvdDataPartitionSize(avdName: string, bytes = 2 * 1024 * 1024 * 1024): void {
+  const configPath = resolve(avdHome(), `${avdName}.avd`, 'config.ini');
+  if (!existsSync(configPath)) return;
+  const original = readFileSync(configPath, 'utf8');
+  const patched = original.replace(DATA_PARTITION_RE, `disk.dataPartition.size = ${bytes}`);
+  if (patched !== original) {
+    writeFileSync(configPath, patched, 'utf8');
+    log.verbose(`Patched disk.dataPartition.size → ${bytes} in ${configPath}`);
+  }
+}
+
 function ensureAvd(apiLevel: number, appDir: string, target = DEFAULT_TARGET, arch = DEFAULT_ARCH): string {
   const desiredName = avdNameForProject(appDir);
   const existing = getAllAVDs();
-  if (existing.includes(desiredName)) return desiredName;
+  if (existing.includes(desiredName)) {
+    patchAvdDataPartitionSize(desiredName);
+    return desiredName;
+  }
 
   const pkg = systemImagePackage(apiLevel, target, arch);
   const avdBin = avdManagerBin();
@@ -484,7 +549,9 @@ async function bootAndroidEmulator({
   const expectedSerial = `emulator-${consolePort}`;
 
   const needsReadOnly = runningAvdNames.has(preferredAvd);
-  const baseArgs = ['-avd', preferredAvd, '-no-audio', '-port', String(consolePort)];
+  // Limit the userdata partition to 2 GB — the emulator default of ~7.4 GB
+  // often exceeds available space on developer machines with limited free disk.
+  const baseArgs = ['-avd', preferredAvd, '-no-audio', '-port', String(consolePort), '-partition-size', '2048'];
   if (needsReadOnly) baseArgs.push('-read-only');
 
   if (headless) {
@@ -556,16 +623,60 @@ function writeAndroidDebugHost(bundleId: string, metroPort: number, deviceSerial
 
 // ── App lifecycle ────────────────────────────────────────────────
 
+/**
+ * Resolve the launcher activity component for a package.
+ *
+ * `adb shell monkey -p <pkg> -c android.intent.category.LAUNCHER 1` is broken
+ * on arm64 Android emulators (API 35 / emulator 36.x): it prints its own arg
+ * list and exits 251 without injecting any events. Use `am start -n` instead,
+ * which requires the fully-qualified component name.
+ *
+ * `cmd package resolve-activity --brief` returns it on a single line:
+ *   "com.example/.MainActivity"
+ * Falls back to `monkey` if the query fails (older API levels / physical devices
+ * where monkey is known-good and `cmd package resolve-activity` may not exist).
+ */
+function resolveAndroidLauncherComponent(bundleId: string, target: string): string | null {
+  try {
+    const out = run(
+      `${adb()} ${target}shell cmd package resolve-activity --brief -c android.intent.category.LAUNCHER ${bundleId}`,
+    );
+    // Output is multi-line; the component is on the last non-empty line.
+    const component = out
+      ?.split('\n')
+      .map(l => l.trim())
+      .filter(Boolean)
+      .at(-1);
+    if (component?.includes('/')) return component;
+  } catch {
+    /* fall through to monkey */
+  }
+  return null;
+}
+
 async function launchAndroidApp(bundleId: string, metroPort: number, deviceSerial?: string): Promise<void> {
   const target = deviceSerial ? `-s ${deviceSerial} ` : '';
   log.verbose(`Launching ${bundleId}...`);
+  log.info('  Stopping previous app instance...');
   run(`${adb()} ${target}shell am force-stop ${bundleId}`);
   await new Promise<void>(r => setTimeout(r, 1000));
+  log.info('  Writing Metro connection config...');
   writeAndroidDebugHost(bundleId, metroPort, deviceSerial);
-  execSync(`${adb()} ${target}shell monkey -p ${bundleId} -c android.intent.category.LAUNCHER 1`, {
-    encoding: 'utf8',
-    stdio: 'pipe',
-  });
+
+  const component = resolveAndroidLauncherComponent(bundleId, target);
+  if (component) {
+    log.info(`  Starting app (${component})...`);
+    execSync(`${adb()} ${target}shell am start -n ${component}`, {
+      encoding: 'utf8',
+      stdio: 'pipe',
+    });
+  } else {
+    log.info('  Starting app via monkey...');
+    execSync(`${adb()} ${target}shell monkey -p ${bundleId} -c android.intent.category.LAUNCHER 1`, {
+      encoding: 'utf8',
+      stdio: 'pipe',
+    });
+  }
   log.verbose('App launched');
 }
 
