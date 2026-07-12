@@ -104,7 +104,23 @@ const config = getDefaultConfig(PROJECT_ROOT);
 // be part of the file map for the physical files to be visible.
 config.watchFolders = [...(config.watchFolders || []), HARNESS_DIR];
 
-const HARNESS_PINNED = new Set(['react', 'react-native', 'react-native-safe-area-context']);
+const HARNESS_PINNED = new Set([
+  'react',
+  'react-native',
+  'react-native-safe-area-context',
+  // Babel runtime helpers — injected by the transformer into every transformed file.
+  '@babel/runtime',
+  // vitest-mobile runtime deps — only installed in the harness tree (via vitest/chai/etc.),
+  // not in the user's workspace root.
+  'chai',
+  'flatted',
+  'pathe',
+  'signalium',
+  '@shopify/restyle',
+  '@vitest/expect',
+  '@vitest/runner',
+  '@vitest/utils',
+]);
 function isHarnessPinned(name) {
   if (HARNESS_PINNED.has(name)) return true;
   for (const pkg of HARNESS_PINNED) {
@@ -115,6 +131,39 @@ function isHarnessPinned(name) {
 
 const prevResolveRequest = config.resolver && config.resolver.resolveRequest;
 const HARNESS_DIR_PREFIX = HARNESS_DIR + path.sep;
+
+// The generated entry file (index.<platform>.js) and metro.config.cjs live in
+// the output dir (`.vitest-mobile/`), which is gitignored so generated files
+// aren't committed. Watchman respects `.gitignore` and therefore excludes that
+// dir from Metro's in-memory file map — so the default resolver reports
+// "None of these files exist" for the bundle entry even though it's on disk.
+// `resolveOnDisk` is a narrow fallback that resolves a module to a real file
+// under the output dir by checking the filesystem directly, bypassing the file
+// map. It only ever returns paths inside OUTPUT_DIR, so it can't mask real
+// resolution failures elsewhere in the tree.
+const OUTPUT_DIR = path.join(PROJECT_ROOT, '.vitest-mobile');
+const OUTPUT_DIR_PREFIX = OUTPUT_DIR + path.sep;
+
+function resolveOnDisk(moduleName, originModulePath, platform) {
+  const originDir =
+    originModulePath && path.extname(originModulePath)
+      ? path.dirname(originModulePath)
+      : originModulePath || PROJECT_ROOT;
+  const base = path.resolve(originDir, moduleName);
+  const candidates = [
+    base + '.' + platform + '.js',
+    base + '.js',
+    base + '.json',
+    path.join(base, 'index.' + platform + '.js'),
+    path.join(base, 'index.js'),
+  ];
+  for (const candidate of candidates) {
+    if (candidate.startsWith(OUTPUT_DIR_PREFIX) && fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+}
 
 config.resolver = Object.assign({}, config.resolver, {
   resolveRequest(ctx, moduleName, platform) {
@@ -149,10 +198,20 @@ config.resolver = Object.assign({}, config.resolver, {
       // origin so Metro's default resolver starts from inside the harness.
       return ctx.resolveRequest(Object.assign({}, ctx, { originModulePath: HARNESS_ANCHOR }), moduleName, platform);
     }
-    if (prevResolveRequest) {
-      return prevResolveRequest(ctx, moduleName, platform);
+    try {
+      if (prevResolveRequest) {
+        return prevResolveRequest(ctx, moduleName, platform);
+      }
+      return ctx.resolveRequest(ctx, moduleName, platform);
+    } catch (err) {
+      // Disk fallback for generated files under .vitest-mobile/ that
+      // watchman excluded from the file map (see resolveOnDisk comment).
+      const diskPath = resolveOnDisk(moduleName, ctx.originModulePath, platform);
+      if (diskPath) {
+        return { type: 'sourceFile', filePath: diskPath };
+      }
+      throw err;
     }
-    return ctx.resolveRequest(ctx, moduleName, platform);
   },
 });
 

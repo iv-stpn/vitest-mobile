@@ -116,7 +116,7 @@ const SUPPRESSED_LOG_PATTERNS = [
 function createDevMiddlewareLogger() {
   function shouldSuppress(args: unknown[]): boolean {
     const msg = args.map(String).join(' ');
-    return SUPPRESSED_LOG_PATTERNS.some(p => p.test(msg));
+    return SUPPRESSED_LOG_PATTERNS.some((p) => p.test(msg));
   }
   const filtered =
     (level: 'verbose' | 'warn' | 'error') =>
@@ -167,7 +167,7 @@ function discoverTestFiles(appDir: string, testPatterns: string[]): string[] {
  */
 function buildContextRegexSource(testPatterns: string[]): string {
   if (testPatterns.length === 0) return '(?!)';
-  const sources = testPatterns.map(p => {
+  const sources = testPatterns.map((p) => {
     // Vitest passes `dot: true` to tinyglobby (see VitestProject.globFiles);
     // mirror it here so the device's match set matches host-side glob results.
     const re = picomatch.makeRe(p, { dot: true });
@@ -213,7 +213,7 @@ export async function prepareMetroConfig(options: MetroRunnerOptions): Promise<P
 
   if (!options.harnessProjectDir) {
     throw new Error(
-      'vitest-mobile: prepareMetroConfig requires harnessProjectDir — harness binary must be built first (run `npx vitest-mobile bootstrap <platform>`).',
+      'vitest-mobile: prepareMetroConfig requires harnessProjectDir — harness binary must be built first (run `bunx vitest-mobile bootstrap --platform <platform>`).',
     );
   }
   const baseConfig = await loadMetroConfig(appDir, outputDir, options.harnessProjectDir);
@@ -255,7 +255,7 @@ export async function startMetroServer(
 ): Promise<MetroServer> {
   if (!runtime.harnessProjectDir) {
     throw new Error(
-      'vitest-mobile: startMetroServer requires harness.projectDir — harness binary must be built first (run `npx vitest-mobile bootstrap <platform>`).',
+      'vitest-mobile: startMetroServer requires harness.projectDir — harness binary must be built first (run `bunx vitest-mobile bootstrap --platform <platform>`).',
     );
   }
   if (runtime.port === undefined || runtime.metroPort === undefined) {
@@ -289,11 +289,7 @@ export async function startMetroServer(
   const configWithFileReporter: ConfigT = { ...config, reporter: tap.reporter };
   log.info(`Metro log: ${metroLogPath}`);
 
-  const { middleware: devMiddleware, websocketEndpoints } = loadDevMiddleware(
-    projectRoot,
-    runtime.harnessProjectDir,
-    port,
-  );
+  const { middleware: devMiddleware, websocketEndpoints } = loadDevMiddleware(projectRoot, runtime.harnessProjectDir, port);
 
   log.info(`Starting Metro on port ${port}...`);
 
@@ -303,7 +299,7 @@ export async function startMetroServer(
   // Without waiting for this, the Node process lingers because jest-worker
   // child processes and fs watchers keep the event loop alive.
   let resolveMetroClosed: () => void = () => {};
-  const metroClosed = new Promise<void>(r => {
+  const metroClosed = new Promise<void>((r) => {
     resolveMetroClosed = r;
   });
 
@@ -342,9 +338,7 @@ export async function startMetroServer(
       //    default — it only stops accepting new ones — so terminate each
       //    client explicitly. This covers the dev-middleware inspector
       //    proxy endpoints that the RN app connects to during testing.
-      const wsEndpointServers: WebSocketServer[] = Object.values(
-        (websocketEndpoints ?? {}) as Record<string, WebSocketServer>,
-      );
+      const wsEndpointServers: WebSocketServer[] = Object.values((websocketEndpoints ?? {}) as Record<string, WebSocketServer>);
       for (const wss of wsEndpointServers) {
         try {
           for (const client of wss.clients) {
@@ -387,7 +381,7 @@ export async function startMetroServer(
       //    sockets are drained (effectively immediate after step 2) and
       //    also triggers Metro's internal 'close' handler which calls
       //    `endMiddleware()` → `metroServer.end()`.
-      await new Promise<void>(r => {
+      await new Promise<void>((r) => {
         httpServer.close(() => r());
         const t = setTimeout(r, 3000);
         (t as unknown as { unref(): void }).unref();
@@ -401,7 +395,7 @@ export async function startMetroServer(
       //    main process from exiting".
       await Promise.race([
         metroClosed,
-        new Promise<void>(r => {
+        new Promise<void>((r) => {
           const t = setTimeout(r, 3000);
           (t as unknown as { unref(): void }).unref();
         }),
@@ -492,7 +486,8 @@ export async function buildBundle(options: BuildBundleOptions): Promise<BundleMa
     });
     if (!harnessResult) {
       throw new Error(
-        `No harness binary found for ${platform}. Build it first:\n\n` + `  npx vitest-mobile bootstrap ${platform}\n`,
+        `No harness binary found for ${platform}. Build it first:\n\n` +
+          `  bunx vitest-mobile bootstrap --platform ${platform}\n`,
       );
     }
 
@@ -540,25 +535,21 @@ export async function buildBundle(options: BuildBundleOptions): Promise<BundleMa
 
 // ── Config Loading ────────────────────────────────────────────────
 
-async function loadMetroConfig(
-  projectRoot: string,
-  outputDir: string,
-  harnessProjectDir: string | undefined,
-): Promise<ConfigT> {
+async function loadMetroConfig(projectRoot: string, outputDir: string, harnessProjectDir: string | undefined): Promise<ConfigT> {
   // We require a harness project for BOTH branches: `metroConfig.loadConfig`
   // itself is resolved from the harness tree, so we need to know where that
   // tree lives before we can load any config — user-provided or generated.
   if (!harnessProjectDir) {
     throw new Error(
-      'vitest-mobile: no harness project directory available — the harness binary must be built first (run `npx vitest-mobile bootstrap <platform>`).',
+      'vitest-mobile: no harness project directory available — the harness binary must be built first (run `bunx vitest-mobile bootstrap --platform <platform>`).',
     );
   }
 
   const { metroConfig } = loadMetroModules(harnessProjectDir);
 
   const userConfigPath = ['metro.config.js', 'metro.config.cjs']
-    .map(name => resolve(projectRoot, name))
-    .find(p => existsSync(p));
+    .map((name) => resolve(projectRoot, name))
+    .find((p) => existsSync(p));
 
   if (userConfigPath) {
     log.verbose(`Loading user ${userConfigPath}`);
@@ -629,10 +620,21 @@ function loadDevMiddleware(
         websocketEndpoints: RunServerOptions['websocketEndpoints'];
       };
     };
+    // Pass a no-op toolLauncher so `openDebuggerMiddleware` doesn't call
+    // `DefaultToolLauncher.prepareDebuggerShell()` at setup time. That default
+    // implementation throws when NODE_ENV=test (which Vitest always sets), even
+    // though vitest-mobile never opens a debugger window during test runs.
+    const noopToolLauncher = {
+      launchDebuggerAppWindow: (_url: string): void => { /* no-op */ },
+      launchDebuggerShell: async (_url: string, _windowKey: string): Promise<{ code: string }> =>
+        ({ code: 'not_implemented' }),
+      prepareDebuggerShell: async (): Promise<{ code: string }> => ({ code: 'not_implemented' }),
+    };
     const result = createDevMiddleware({
       projectRoot,
       serverBaseUrl: `http://127.0.0.1:${port}`,
       logger: createDevMiddlewareLogger(),
+      unstable_toolLauncher: noopToolLauncher,
     });
     log.verbose('Dev middleware (inspector proxy) enabled');
     return {
@@ -647,12 +649,7 @@ function loadDevMiddleware(
 
 // ── Entry Point ───────────────────────────────────────────────────
 
-function generateEntryPoint(opts: {
-  entryPath: string;
-  appModuleName: string;
-  wsPort: number;
-  metroPort: number;
-}): void {
+function generateEntryPoint(opts: { entryPath: string; appModuleName: string; wsPort: number; metroPort: number }): void {
   const content = renderNodeTemplate('index.entry.js', {
     APP_MODULE_NAME: opts.appModuleName,
     WS_PORT: String(opts.wsPort),
@@ -751,11 +748,7 @@ function applyTestTransforms(
 
   // Module resolution: redirect vitest → shim, test-context → dist runtime
   const originalResolver = config.resolver.resolveRequest;
-  const resolveRequest: CustomResolver = (
-    context: CustomResolutionContext,
-    moduleName: string,
-    platform: string | null,
-  ) => {
+  const resolveRequest: CustomResolver = (context: CustomResolutionContext, moduleName: string, platform: string | null) => {
     if (moduleName === 'vitest-mobile/test-context') {
       return { type: 'sourceFile', filePath: testContextPath };
     }
@@ -837,6 +830,16 @@ function applyTestTransforms(
       unstable_enablePackageExports: true,
       unstable_conditionNames: conditions,
       resolveRequest,
+      // Watchman respects `.gitignore`, and the generated entry file
+      // (`.vitest-mobile/index.<platform>.js`) lives in a gitignored output
+      // dir so generated files aren't committed. That excludes it from
+      // Watchman's file map, and Metro needs the file in the map to compute
+      // its SHA-1 — so the bundle fails with "Failed to get the SHA-1 for:
+      // …/.vitest-mobile/index.android.js". The Node fs crawler does NOT
+      // respect `.gitignore`, so it sees the entry file. File watching (HMR
+      // in dev mode) still works via fs.watch; the trade-off is a slower
+      // first crawl of the harness tree (cached afterwards).
+      useWatchman: false,
     },
     // Intentionally do NOT override config.serializer.getModulesRunBeforeMainModule
     // or config.transformer.assetRegistryPath. The harness-anchored @react-native/metro-config
