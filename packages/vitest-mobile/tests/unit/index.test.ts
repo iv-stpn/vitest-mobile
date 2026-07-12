@@ -20,6 +20,7 @@ function runConfigure(
   const vitest = {
     watcher: { unregisterWatcher: vi.fn() },
     rerunFiles: vi.fn(),
+    logger: { warn: vi.fn() },
   };
   const p = plugin as Plugin & { configureVitest: (c: VitestPluginContext) => void };
   p.configureVitest({
@@ -106,10 +107,13 @@ describe('nativePlugin', () => {
     expect(cfg.maxWorkers).toBe(1);
   });
 
-  it('does not override test.isolate when the user has already set it', () => {
+  it('forces test.isolate to false even when the user set it to true', () => {
     const plugin = nativePlugin();
     const { projectConfig: cfg } = runConfigure(plugin, { isolate: true });
-    expect(cfg.isolate).toBe(true);
+    // isolate: false is MANDATORY for the native pool — a single RN JS VM is
+    // shared across files, so per-file isolation would tear down Metro + the
+    // device socket mid-run. The plugin overrides the user's value and warns.
+    expect(cfg.isolate).toBe(false);
   });
 
   it('sets default test.include when none is present', () => {

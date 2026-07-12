@@ -1,5 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+// react-native's index.js is Flow-typed and can't be SSR-transformed by vite.
+// locator.ts (via retry/host-bridge/native-harness) imports it transitively, so
+// stub the surface these unit tests touch to keep them Node-level.
+vi.mock('react-native', () => ({
+  PixelRatio: { get: () => 1 },
+  Platform: { OS: 'ios' },
+  TurboModuleRegistry: { get: () => null, getEnforcing: () => null },
+  NativeModules: {},
+}));
+
 // Mock the tree module so locator tests stay unit-level
 vi.mock('../../src/runtime/tree', () => ({
   resolveByTestId: vi.fn(),
@@ -9,7 +19,10 @@ vi.mock('../../src/runtime/tree', () => ({
   readText: vi.fn(),
   readProps: vi.fn(),
   findHandler: vi.fn(),
-  Harness: null,
+  // flushUIQueue is called on the drain path before every tap/type; provide it
+  // but leave simulatePress/typeIntoView undefined so control falls through to
+  // the findHandler branch these unit tests exercise.
+  Harness: { flushUIQueue: vi.fn(() => Promise.resolve()) },
 }));
 
 import {
