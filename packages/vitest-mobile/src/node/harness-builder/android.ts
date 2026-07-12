@@ -70,13 +70,19 @@ export async function buildAndroid(projectDir: string, buildDir: string): Promis
 
 /**
  * Remove Android intermediates from a build cache entry, keeping the .apk.
+ *
+ * Note: we must NOT delete `projectDir/ios` here. The scaffolded project is
+ * shared between both platforms (one projectDir, one platform-independent
+ * cache key) — only the native build step is per-platform. Deleting the iOS
+ * source dir would leave the `.vitest-mobile-customized` marker in place while
+ * removing the project the next iOS build needs, so that build would skip
+ * scaffolding and then crash in the RN CLI with a null `ctx.project.ios`.
  */
 export function trimAndroidBuildArtifacts(projectDir: string): void {
   const dirsToRemove = [
     resolve(projectDir, 'android', '.gradle'),
     resolve(projectDir, 'android', 'app', 'build', 'intermediates'),
     resolve(projectDir, 'android', 'app', 'build', 'tmp'),
-    resolve(projectDir, 'ios'),
     resolve(projectDir, 'vendor'),
   ];
   for (const dir of dirsToRemove) {

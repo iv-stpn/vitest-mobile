@@ -196,7 +196,15 @@ export async function ensureHarnessBinary(options: HarnessBuildOptions): Promise
 
   try {
     const buildStart = Date.now();
-    const isProjectReady = existsSync(resolve(projectDir, '.vitest-mobile-customized'));
+    // A project is only "ready" if the customization marker is present AND the
+    // native project dir for the platform we're about to build still exists.
+    // The scaffold is shared between platforms; an older vitest-mobile trimmed
+    // the *other* platform's native dir after a build, which could leave the
+    // marker in place while the dir this build needs was already deleted. Treat
+    // a missing native dir as "not ready" so we re-scaffold instead of handing
+    // xcodebuild/Gradle a project that isn't there.
+    const nativeDir = resolve(projectDir, options.platform === 'ios' ? 'ios' : 'android');
+    const isProjectReady = existsSync(resolve(projectDir, '.vitest-mobile-customized')) && existsSync(nativeDir);
 
     if (!isProjectReady) {
       log.info('');

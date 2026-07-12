@@ -172,6 +172,15 @@ export class Locator {
       await Harness.flushUIQueue();
     } else if (el.nativeId && Harness?.typeIntoView) {
       await Harness.typeIntoView(el.nativeId, text);
+      // Native insertText: fires onChangeText on the JS thread, but the
+      // resulting setState re-render isn't guaranteed to have committed by the
+      // time this resolves. Drain the UI queue and yield to JS (mirroring the
+      // host-bridge path above) so the controlled value is committed before a
+      // subsequent tap() reads a handler closed over the typed text — otherwise
+      // e.g. an "add" handler gated on the input still sees the pre-type value.
+      await Harness.flushUIQueue();
+      await new Promise<void>(r => g.setImmediate?.(r) ?? setTimeout(r, 0));
+      await Harness.flushUIQueue();
     } else {
       const handler = findHandler(el, 'onChangeText');
       if (!handler) throw new Error(`No onChangeText handler found on element: ${this._description}`);

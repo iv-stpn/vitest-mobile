@@ -112,6 +112,13 @@ export async function buildIOS(projectDir: string): Promise<void> {
 /**
  * Remove iOS intermediates from a build cache entry, keeping the .app.
  * Drastically reduces cache size for CI save/restore.
+ *
+ * Note: we must NOT delete `projectDir/android` here. The scaffolded project
+ * is shared between both platforms (one projectDir, one platform-independent
+ * cache key) — only the native build step is per-platform. Deleting the
+ * Android source dir would leave the `.vitest-mobile-customized` marker in
+ * place while removing the project the next Android build needs, so that build
+ * would skip scaffolding and then fail to find its Gradle project.
  */
 export function trimIOSBuildArtifacts(projectDir: string): void {
   const dirsToRemove = [
@@ -121,7 +128,6 @@ export function trimIOSBuildArtifacts(projectDir: string): void {
     resolve(projectDir, 'ios', 'DerivedData', 'ModuleCache.noindex'),
     resolve(projectDir, 'ios', 'DerivedData', 'info.plist'),
     resolve(projectDir, 'vendor'), // bundler gems
-    resolve(projectDir, 'android'),
   ];
   for (const dir of dirsToRemove) {
     if (existsSync(dir)) {
