@@ -36,6 +36,7 @@ import { setHarnessStatus } from './store';
 import { configurePause, resume as resumePause } from './pause';
 import { isPoolMessage, type PoolMessage } from '../shared/pool-messages';
 import { getPaths, getTestRun } from './test-context';
+import { setHostBridgeConnection, resolveTapResponse } from './host-bridge';
 import type { ReactiveTaskFields } from './tasks';
 import { applyCollected, applyTaskUpdate } from './tasks';
 
@@ -73,6 +74,7 @@ export class HarnessRuntime {
 
   constructor() {
     this.connection = new DevicePoolConnection();
+    setHostBridgeConnection(this.connection);
 
     this.connection.on((data: unknown) => {
       if (!isPoolMessage(data)) return;
@@ -294,6 +296,10 @@ export class HarnessRuntime {
         return this.handleError(msg);
       case 'resume':
         return resumePause();
+      case 'tapResponse':
+        return resolveTapResponse(msg.data.requestId, msg.data.error);
+      case 'typeTextResponse':
+        return resolveTapResponse(msg.data.requestId, msg.data.error);
     }
   }
 

@@ -7,6 +7,7 @@
  * - tap(), type() are async (involve timing/side effects)
  */
 
+import { PixelRatio } from 'react-native';
 import { waitFor, type RetryOptions } from './retry';
 import type { ViewInfo } from './native-harness';
 import {
@@ -19,6 +20,7 @@ import {
   findHandler,
   Harness,
 } from './tree';
+import { requestHostTap, requestHostTypeText, isHostBridgeReady } from './host-bridge';
 import { g } from './global-types';
 
 export class Locator {
@@ -71,14 +73,57 @@ export class Locator {
 
   // ── Actions (async) ──
 
-  async tap(): Promise<void> {
-    const el = await waitFor(() => {
+  /**
+   * Resolve the element only once its frame has stabilized across two
+   * consecutive queries. Fabric applies mount/unmount transactions
+   * asynchronously (VSYNC-gated), so right after a render the view tree can
+   * still hold a stale view from the previous test (same testID, different
+   * position/size) — resolving on the first hit can return that stale view.
+   * Requiring two matching samples waits for the tree to settle.
+   */
+  private async resolveStable(): Promise<ResolvedElement> {
+    let prev: { x: number; y: number; width: number; height: number } | null = null;
+    return waitFor(() => {
       const resolved = this._resolve();
-      if (!resolved) throw new Error(`Locator could not find element: ${this._description}`);
-      return resolved;
+      if (!resolved) {
+        prev = null;
+        throw new Error(`Locator could not find element: ${this._description}`);
+      }
+      const { x, y, width, height } = resolved.info;
+      if (prev !== null && prev.x === x && prev.y === y && prev.width === width && prev.height === height) {
+        return resolved;
+      }
+      prev = { x, y, width, height };
+      throw new Error(`Locator view not stable yet: ${this._description}`);
     });
+  }
+
+  async tap(): Promise<void> {
+    // Drain any pending mount/layout so the query reads the committed tree —
+    // otherwise the first query after a render can hit a stale or not-yet-laid-
+    // out view at pre-layout coordinates, and the tap misses its target.
+    await Harness.flushUIQueue();
+    await new Promise<void>(r => g.setImmediate?.(r) ?? setTimeout(r, 0));
+    await Harness.flushUIQueue();
+    const el = await this.resolveStable();
     const { info } = el;
-    if (info && Harness?.simulatePress) {
+    if (info && isHostBridgeReady()) {
+      // Host-side `adb shell input tap` injects through the full InputManager
+      // pipeline (proper touch session), which reliably fires onPress — unlike
+      // in-process dispatchTouchEvent, which is flaky on Android headless.
+      // info.x/y/width/height are in dp; convert to screen pixels for adb.
+      const density = PixelRatio.get();
+      const px = Math.round((info.x + info.width / 2) * density);
+      const py = Math.round((info.y + info.height / 2) * density);
+      await requestHostTap(px, py);
+      // Yield to let RN process the touch (onPress → setState → re-render).
+      // Deliberately do NOT call flushUIQueue here: the native flushUIQueue
+      // drives a synchronous measure()+layout() pass, which disrupts the
+      // view's touch state and causes the *next* consecutive tap to be
+      // dropped. The assertion's polling handles the re-render commit.
+      await new Promise<void>(r => g.setImmediate?.(r) ?? setTimeout(r, 0));
+      await new Promise<void>(r => g.setImmediate?.(r) ?? setTimeout(r, 0));
+    } else if (info && Harness?.simulatePress) {
       const cx = info.x + info.width / 2;
       const cy = info.y + info.height / 2;
       await Harness.simulatePress(el.nativeId, cx, cy);
@@ -104,12 +149,28 @@ export class Locator {
   }
 
   async type(text: string): Promise<void> {
-    const el = await waitFor(() => {
-      const resolved = this._resolve();
-      if (!resolved) throw new Error(`Locator could not find element: ${this._description}`);
-      return resolved;
-    });
-    if (el.nativeId && Harness?.typeIntoView) {
+    // Drain pending mount/layout before querying (see tap() for rationale).
+    await Harness.flushUIQueue();
+    await new Promise<void>(r => g.setImmediate?.(r) ?? setTimeout(r, 0));
+    await Harness.flushUIQueue();
+    const el = await this.resolveStable();
+    const { info } = el;
+    if (info && isHostBridgeReady()) {
+      // Focus the field with a host tap, then type via the host IME. In-process
+      // text mutation gets reverted by RN's controlled-component logic before
+      // onChangeText reaches JS; `adb shell input text` is real IME input that
+      // RN treats as user typing, so onChangeText fires reliably.
+      const density = PixelRatio.get();
+      const px = Math.round((info.x + info.width / 2) * density);
+      const py = Math.round((info.y + info.height / 2) * density);
+      await requestHostTap(px, py);
+      await Harness.flushUIQueue();
+      await new Promise<void>(r => g.setImmediate?.(r) ?? setTimeout(r, 0));
+      await requestHostTypeText(text);
+      await Harness.flushUIQueue();
+      await new Promise<void>(r => g.setImmediate?.(r) ?? setTimeout(r, 0));
+      await Harness.flushUIQueue();
+    } else if (el.nativeId && Harness?.typeIntoView) {
       await Harness.typeIntoView(el.nativeId, text);
     } else {
       const handler = findHandler(el, 'onChangeText');

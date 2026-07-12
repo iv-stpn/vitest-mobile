@@ -26,6 +26,8 @@ export type DeviceMessage =
   | { type: 'pause'; data?: { label?: string; screenshot?: boolean } }
   | { type: 'pauseEnded' }
   | { type: 'screenshotRequest'; data: { requestId: string; name?: string } }
+  | { type: 'tapRequest'; data: { requestId: string; x: number; y: number } }
+  | { type: 'typeTextRequest'; data: { requestId: string; text: string } }
   | { type: 'update'; data: DeviceUpdatePayload };
 
 type DeviceMessageType = DeviceMessage['type'];
@@ -35,6 +37,8 @@ type DeviceMessageType = DeviceMessage['type'];
 export type PoolMessage =
   | { type: 'resume' }
   | { type: 'screenshotResponse'; data: { requestId: string; filePath?: string; error?: string } }
+  | { type: 'tapResponse'; data: { requestId: string; error?: string } }
+  | { type: 'typeTextResponse'; data: { requestId: string; error?: string } }
   | { type: 'error'; data: { message: string } };
 
 type PoolMessageType = PoolMessage['type'];
@@ -45,9 +49,17 @@ const DEVICE_TYPES: ReadonlySet<string> = new Set<DeviceMessageType>([
   'pause',
   'pauseEnded',
   'screenshotRequest',
+  'tapRequest',
+  'typeTextRequest',
   'update',
 ]);
-const POOL_TYPES: ReadonlySet<string> = new Set<PoolMessageType>(['resume', 'screenshotResponse', 'error']);
+const POOL_TYPES: ReadonlySet<string> = new Set<PoolMessageType>([
+  'resume',
+  'screenshotResponse',
+  'tapResponse',
+  'typeTextResponse',
+  'error',
+]);
 
 function hasStringType(msg: unknown): msg is { type: string } {
   return typeof msg === 'object' && msg !== null && typeof (msg as { type: unknown }).type === 'string';

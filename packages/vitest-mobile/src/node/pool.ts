@@ -51,6 +51,7 @@ import {
 } from './instance-manager';
 import { log, setVerbose } from './logger';
 import { captureScreenshot } from './screenshot';
+import { run, getAdbPath } from './exec-utils';
 import { detectPrebuiltBundle, startStaticBundleServer } from './bundle-server';
 import { PauseController } from './pause-controller';
 import { withDefaults } from './options';
@@ -139,6 +140,21 @@ export class NativePoolWorker implements PoolWorker {
         resolvePromise();
       };
     });
+  }
+
+  /**
+   * Like `waitForApp`, but emits a progress log every `tickMs` so the user
+   * sees the wait is active rather than a silent pause.
+   */
+  private waitForAppWithProgress(timeoutMs = this.options.appConnectTimeout, tickMs = 5000): Promise<void> {
+    const start = Date.now();
+    const ticker = unrefTimer(
+      setInterval(() => {
+        const elapsed = Math.round((Date.now() - start) / 1000);
+        log.info(`  Still waiting for app connection (${elapsed}s elapsed)...`);
+      }, tickMs),
+    );
+    return this.waitForApp(timeoutMs).finally(() => clearInterval(ticker));
   }
 
   // ── Cleanup ─────────────────────────────────────────────────────
@@ -267,6 +283,12 @@ export class NativePoolWorker implements PoolWorker {
       case 'screenshotRequest':
         this.handleScreenshotRequest(msg.data);
         return;
+      case 'tapRequest':
+        this.handleTapRequest(msg.data);
+        return;
+      case 'typeTextRequest':
+        this.handleTypeTextRequest(msg.data);
+        return;
       case 'update':
         this.handleUpdate(msg.data, acceptReconnectReplay);
         return;
@@ -304,6 +326,55 @@ export class NativePoolWorker implements PoolWorker {
         type: 'screenshotResponse',
         data: { requestId: data.requestId, error: err instanceof Error ? err.message : String(err) },
       });
+    }
+  }
+
+  private handleTapRequest(data: { requestId: string; x: number; y: number }): void {
+    // Inject the tap via `adb shell input tap`, which routes through the
+    // InputManager/InputDispatcher (the same path a real finger takes) —
+    // reliable on headless emulators, unlike in-process dispatchTouchEvent.
+    // Only Android supports this; iOS uses its in-process TouchInjector.
+    if (this.options.platform !== 'android') {
+      this.relayToDevice({ type: 'tapResponse', data: { requestId: data.requestId, error: 'host tap only supported on android' } });
+      return;
+    }
+    const deviceId = this.runtime.deviceId;
+    if (!deviceId) {
+      this.relayToDevice({ type: 'tapResponse', data: { requestId: data.requestId, error: 'no device id' } });
+      return;
+    }
+    const cmd = `${getAdbPath()} -s ${deviceId} shell input tap ${Math.round(data.x)} ${Math.round(data.y)}`;
+    const result = run(cmd, { timeout: 15000 });
+    if (result === null) {
+      this.relayToDevice({ type: 'tapResponse', data: { requestId: data.requestId, error: `adb input tap failed: ${cmd}` } });
+    } else {
+      this.relayToDevice({ type: 'tapResponse', data: { requestId: data.requestId } });
+    }
+  }
+
+  private handleTypeTextRequest(data: { requestId: string; text: string }): void {
+    // Type into the currently-focused field via the IME. Unlike mutating the
+    // EditText's text in-process (which RN's controlled-component logic reverts
+    // before onChangeText reaches JS), `adb shell input text` is real IME input
+    // that RN treats as user typing — onChangeText fires reliably.
+    // `input text` joins argv with spaces and decodes %s as space / %% as %,
+    // so escape the text accordingly.
+    if (this.options.platform !== 'android') {
+      this.relayToDevice({ type: 'typeTextResponse', data: { requestId: data.requestId, error: 'host type only supported on android' } });
+      return;
+    }
+    const deviceId = this.runtime.deviceId;
+    if (!deviceId) {
+      this.relayToDevice({ type: 'typeTextResponse', data: { requestId: data.requestId, error: 'no device id' } });
+      return;
+    }
+    const escaped = data.text.replace(/%/g, '%%').replace(/\s/g, '%s');
+    const cmd = `${getAdbPath()} -s ${deviceId} shell input text ${JSON.stringify(escaped)}`;
+    const result = run(cmd, { timeout: 15000 });
+    if (result === null) {
+      this.relayToDevice({ type: 'typeTextResponse', data: { requestId: data.requestId, error: `adb input text failed: ${cmd}` } });
+    } else {
+      this.relayToDevice({ type: 'typeTextResponse', data: { requestId: data.requestId } });
     }
   }
 
@@ -386,7 +457,8 @@ export class NativePoolWorker implements PoolWorker {
       await new Promise<void>(r => unrefTimer(setTimeout(r, 500)));
       await this.launchWithRetry();
     }
-    await this.waitForApp(this.options.appConnectTimeout);
+    log.info('App process started, waiting for WebSocket connection...');
+    await this.waitForAppWithProgress(this.options.appConnectTimeout);
   }
 
   private async doStart(): Promise<void> {
