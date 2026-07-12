@@ -84,12 +84,20 @@ export function nativePlugin(options: NativePluginOptions = {}): Plugin {
     cfg.pool = poolRunner.name;
     cfg.poolRunner = poolRunner;
     cfg.maxWorkers = 1;
-    // isolate: false — worker can share runtime across files. With maxWorkers=1
-    // this groups specs so the worker runs once per user-initiated run, matching
-    // the single RN JS VM. Respect an explicit user override.
-    if (cfg.isolate === undefined) {
-      cfg.isolate = false;
+    // isolate: false — MANDATORY for the native pool. There is a single RN JS
+    // VM per platform that persists across files, so per-file isolation is
+    // impossible. With isolate: true (Vitest's default), the scheduler does a
+    // full worker cycle per file — run(file) → worker.stop() → run(next file)
+    // — and worker.stop() tears down Metro + terminates the device socket, so
+    // every file after the first arrives with no connection and the run stops
+    // early. isolate: false makes Vitest reuse one worker for the whole run.
+    if (cfg.isolate === true) {
+      ctx.vitest.logger.warn(
+        'vitest-mobile: `isolate: true` is incompatible with the native pool ' +
+          '(a single RN JS VM is shared across files) — forcing `isolate: false`.',
+      );
     }
+    cfg.isolate = false;
     if (!cfg.include) {
       cfg.include = DEFAULT_INCLUDE;
     }
