@@ -3,7 +3,6 @@ package com.vitestmobileharness
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
-import android.view.Choreographer
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
@@ -166,29 +165,18 @@ class VitestMobileHarnessModule(
   override fun typeIntoView(nativeId: String, text: String, promise: Promise) {
     UiThreadUtil.runOnUiThread {
       val view = getView(nativeId)
-      if (view != null) {
-        val activity = currentActivity ?: run { promise.resolve(null); return@runOnUiThread }
-        val root = activity.window.decorView
-        val loc = IntArray(2)
-        view.getLocationOnScreen(loc)
-        val cx = (loc[0] + view.width / 2.0f)
-        val cy = (loc[1] + view.height / 2.0f)
-        val downTime = SystemClock.uptimeMillis()
-
-        val downEvent = MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, cx, cy, 0)
-        try { root.dispatchTouchEvent(downEvent) } finally { downEvent.recycle() }
-        val upEvent = MotionEvent.obtain(downTime, downTime + 30, MotionEvent.ACTION_UP, cx, cy, 0)
-        try { root.dispatchTouchEvent(upEvent) } finally { upEvent.recycle() }
-
-        mainHandler.postDelayed({
-          val focused = activity.currentFocus
-          if (focused is EditText) {
-            val start = focused.selectionStart
-            val end = focused.selectionEnd
-            focused.text.replace(start, end, text)
-          }
-          mainHandler.postDelayed({ promise.resolve(null) }, EVENT_DELAY_MS)
-        }, 100)
+      if (view is EditText) {
+        // Set the text directly on the target EditText instead of synthesizing
+        // a touch to focus it. In-process dispatchTouchEvent is flaky on
+        // headless Android (often doesn't focus the field), which left
+        // `currentFocus` pointing elsewhere and the text replace a no-op.
+        // Mutating the EditText's text directly fires its TextWatcher, which
+        // is what React Native wires onChangeText to, so the JS side sees the
+        // new value just as if it had been typed.
+        view.requestFocus()
+        view.text.replace(0, view.text.length, text)
+        view.setSelection(view.text.length)
+        mainHandler.postDelayed({ promise.resolve(null) }, EVENT_DELAY_MS)
       } else {
         promise.resolve(null)
       }
@@ -196,9 +184,38 @@ class VitestMobileHarnessModule(
   }
 
   override fun flushUIQueue(promise: Promise) {
-    UiThreadUtil.runOnUiThread {
-      Choreographer.getInstance().postFrameCallback {
-        promise.resolve(null)
+    // Drain pending React/Fabric mount work and force a synchronous layout pass
+    // so views have correct frames (getLocationOnScreen / width / height) before
+    // the JS side queries them or computes tap coordinates.
+    //
+    // Choreographer.postFrameCallback (an earlier version) hangs in headless
+    // mode (-no-window) because VSYNC doesn't fire when the UI is idle. A plain
+    // triple main-handler post avoids the deadlock but does NOT apply pending
+    // layout, so tap coordinates were computed from un-laid-out views and missed
+    // their target. Driving measure()+layout() directly applies the pending
+    // layout without depending on VSYNC.
+    //
+    // Earlier this manual traversal broke touch dispatch — but only because taps
+    // used in-process dispatchTouchEvent, whose state the manual layout
+    // disrupted. Taps now go through `adb shell input tap` (host-side, via the
+    // InputManager), which is independent of the in-process dispatch state, so
+    // the layout drain is safe again.
+    mainHandler.post {
+      val root = currentActivity?.window?.decorView
+      if (root != null && root.isLayoutRequested) {
+        val dm = root.resources.displayMetrics
+        val w = if (root.width > 0) root.width else dm.widthPixels
+        val h = if (root.height > 0) root.height else dm.heightPixels
+        root.measure(
+          View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY),
+          View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY),
+        )
+        root.layout(0, 0, root.measuredWidth, root.measuredHeight)
+      }
+      mainHandler.post {
+        mainHandler.post {
+          promise.resolve(null)
+        }
       }
     }
   }
