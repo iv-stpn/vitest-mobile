@@ -43,24 +43,24 @@ bun install vitest-mobile
 Create a `vitest.config.ts` at the root of your project with the `nativePlugin`:
 
 ```typescript
-import { defineConfig } from "vitest/config";
-import { nativePlugin } from "vitest-mobile";
+import { defineConfig } from 'vitest/config';
+import { nativePlugin } from 'vitest-mobile';
 
 export default defineConfig({
   test: {
     projects: [
       {
-        plugins: [nativePlugin({ platform: "ios" })],
+        plugins: [nativePlugin({ platform: 'ios' })],
         test: {
-          name: "ios",
-          include: ["test-packages/**/tests/**/*.test.tsx"],
+          name: 'ios',
+          include: ['test-packages/**/tests/**/*.test.tsx'],
         },
       },
       {
-        plugins: [nativePlugin({ platform: "android" })],
+        plugins: [nativePlugin({ platform: 'android' })],
         test: {
-          name: "android",
-          include: ["test-packages/**/tests/**/*.test.tsx"],
+          name: 'android',
+          include: ['test-packages/**/tests/**/*.test.tsx'],
         },
       },
     ],
@@ -92,25 +92,25 @@ Tests look like standard Vitest tests, but use `vitest-mobile/runtime` for
 rendering into real native views:
 
 ```tsx
-import React from "react";
-import { afterEach, describe, expect, it } from "vitest";
-import { cleanup, render, waitFor } from "vitest-mobile/runtime";
-import { CounterModule } from "../CounterModule";
+import React from 'react';
+import { afterEach, describe, expect, it } from 'vitest';
+import { cleanup, render, waitFor } from 'vitest-mobile/runtime';
+import { CounterModule } from '../CounterModule';
 
 afterEach(async () => {
   await cleanup();
 });
 
-describe("CounterModule", () => {
-  it("renders initial count of zero", async () => {
+describe('CounterModule', () => {
+  it('renders initial count of zero', async () => {
     const screen = await render(<CounterModule userId="123" />);
-    await expect.element(screen.getByTestId("count-display")).toHaveText("0");
+    await expect.element(screen.getByTestId('count-display')).toHaveText('0');
   });
 
-  it("increments on press", async () => {
+  it('increments on press', async () => {
     const screen = await render(<CounterModule userId="123" />);
-    await screen.getByTestId("increment-btn").tap();
-    await expect.element(screen.getByTestId("count-display")).toHaveText("1");
+    await screen.getByTestId('increment-btn').tap();
+    await expect.element(screen.getByTestId('count-display')).toHaveText('1');
   });
 });
 ```
@@ -120,13 +120,7 @@ describe("CounterModule", () => {
 ### Rendering
 
 ```typescript
-import {
-  cleanup,
-  pause,
-  render,
-  screenshot,
-  waitFor,
-} from "vitest-mobile/runtime";
+import { cleanup, pause, render, screenshot, waitFor } from 'vitest-mobile/runtime';
 ```
 
 | Function                         | Description                                                                         |
@@ -170,7 +164,7 @@ import {
 Use `expect.element(locator)` for automatic retrying:
 
 ```tsx
-await expect.element(screen.getByTestId("count")).toHaveText("1");
+await expect.element(screen.getByTestId('count')).toHaveText('1');
 ```
 
 ## CLI Reference

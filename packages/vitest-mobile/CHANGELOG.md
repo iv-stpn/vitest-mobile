@@ -233,8 +233,8 @@ assembleDebug` to
 
   ```ts
   nativePlugin({
-    harness: { nativeModules: ["react-native-reanimated"] },
-    metro: { babelPlugins: ["react-native-reanimated/plugin"] },
+    harness: { nativeModules: ['react-native-reanimated'] },
+    metro: { babelPlugins: ['react-native-reanimated/plugin'] },
   });
   ```
 
@@ -267,7 +267,7 @@ assembleDebug` to
   ```ts
   // Before
   nativePlugin({
-    platform: "ios",
+    platform: 'ios',
     headless: true,
     bundle: true,
     metro: customizerFn,
@@ -275,7 +275,7 @@ assembleDebug` to
 
   // After
   nativePlugin({
-    platform: "ios",
+    platform: 'ios',
     device: { headless: true },
     metro: { bundle: true, customize: customizerFn },
   });

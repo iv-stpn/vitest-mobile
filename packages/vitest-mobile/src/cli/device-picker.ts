@@ -21,7 +21,13 @@
 
 import { isCancel, select } from '@clack/prompts';
 import { getBootedSimulators, listAllIOSSimulators, primarySimulatorName } from '../node/device/ios';
-import { listAllAvds, avdNameForProject, hasAvdProvisioningTools, getAvdAbi, HOST_AVD_ARCH } from '../node/device/android';
+import {
+  listAllAvds,
+  avdNameForProject,
+  hasAvdProvisioningTools,
+  getAvdAbi,
+  HOST_AVD_ARCH,
+} from '../node/device/android';
 import { getDeviceMapping, setDeviceMapping, type DeviceMapping } from '../node/device/mapping';
 import type { Platform } from '../node/types';
 

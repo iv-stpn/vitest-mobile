@@ -93,7 +93,8 @@ export async function bootstrap(platform: string, options: BootstrapOptions): Pr
     });
 
     if (!restored) updateStatus(`Booting ${platform} device…`);
-    const deviceId = restored ?? (await ensureDevice(p, { appDir, bundleId }, { headless: true, apiLevel: options.apiLevel }));
+    const deviceId =
+      restored ?? (await ensureDevice(p, { appDir, bundleId }, { headless: true, apiLevel: options.apiLevel }));
 
     const didInstall = installIfNeeded(p, bundleId, result.binaryPath, result.cacheKey, deviceId);
 
@@ -119,7 +120,13 @@ export async function bootstrap(platform: string, options: BootstrapOptions): Pr
 }
 
 /** @returns true if the binary was actually installed, false if skipped. */
-function installIfNeeded(platform: Platform, bundleId: string, binaryPath: string, cacheKey: string, deviceId?: string): boolean {
+function installIfNeeded(
+  platform: Platform,
+  bundleId: string,
+  binaryPath: string,
+  cacheKey: string,
+  deviceId?: string,
+): boolean {
   const installedKey = getInstalledCacheKey(platform, { appDir: process.cwd(), bundleId, deviceId });
   if (installedKey === cacheKey) {
     updateStatus(`Harness binary already installed — skipping`);

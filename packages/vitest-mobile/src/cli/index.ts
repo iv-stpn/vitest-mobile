@@ -30,30 +30,38 @@ cli
   .option('--force', 'Force rebuild (clear cache)')
   .option('--verbose', 'Stream child-process output to stdout instead of using a spinner')
   .option('--native-modules <modules>', 'Comma-separated list of react-native native modules (overrides vitest config)')
-  .action(async (options: { platform?: string; appDir: string; force: boolean; verbose?: boolean; nativeModules?: string }) => {
-    rejectLegacyPositional(cli.args);
-    const platform = (await resolvePlatformInteractive(options.platform, {
-      command: 'build',
-    })) as Platform;
-    const { build } = await import('./build');
-    const appDir = resolve(process.cwd(), options.appDir);
-    const nativeModules = await resolveNativeModules(options.nativeModules, appDir, [platform]);
-    await withSpinner(
-      {
+  .action(
+    async (options: {
+      platform?: string;
+      appDir: string;
+      force: boolean;
+      verbose?: boolean;
+      nativeModules?: string;
+    }) => {
+      rejectLegacyPositional(cli.args);
+      const platform = (await resolvePlatformInteractive(options.platform, {
         command: 'build',
-        platform,
-        initialMessage: `Building ${platform} harness binary…`,
-        verbose: options.verbose,
-      },
-      async () => {
-        await build(platform, {
-          appDir: options.appDir,
-          force: options.force,
-          nativeModules,
-        });
-      },
-    );
-  });
+      })) as Platform;
+      const { build } = await import('./build');
+      const appDir = resolve(process.cwd(), options.appDir);
+      const nativeModules = await resolveNativeModules(options.nativeModules, appDir, [platform]);
+      await withSpinner(
+        {
+          command: 'build',
+          platform,
+          initialMessage: `Building ${platform} harness binary…`,
+          verbose: options.verbose,
+        },
+        async () => {
+          await build(platform, {
+            appDir: options.appDir,
+            force: options.force,
+            nativeModules,
+          });
+        },
+      );
+    },
+  );
 
 cli
   .command('install', 'Install harness binary on device')
@@ -170,7 +178,7 @@ cli
       const { buildBundle } = await import('../node/metro-runner');
       const outDir = resolve(process.cwd(), options.out);
       const testPatterns = options.include
-        ? options.include.split(',').map((p) => p.trim())
+        ? options.include.split(',').map(p => p.trim())
         : await readTestPatternsFromConfig(process.cwd(), platforms, options.config);
       if (testPatterns.length === 0) {
         console.error('No test patterns found. Provide --include or ensure vitest config has test.include.');
@@ -406,7 +414,9 @@ cli
       // User picked an existing simulator/AVD of their own — we never touch it.
       // Just clear the mapping so next bootstrap re-prompts.
       if (!options.apply) {
-        console.log(`Configured ${platform} device for ${appDir}: ${mapping.deviceName} (not created by vitest-mobile).`);
+        console.log(
+          `Configured ${platform} device for ${appDir}: ${mapping.deviceName} (not created by vitest-mobile).`,
+        );
         console.log('Run with --apply to clear the mapping (the device itself will not be deleted).');
         return;
       }
@@ -421,7 +431,9 @@ cli
     if (existing.length === 0) {
       // Mapping existed but device is gone — just clear the mapping.
       if (!options.apply) {
-        console.log(`Configured ${platform} device '${mapping.deviceName}' is already gone; run --apply to clear the mapping.`);
+        console.log(
+          `Configured ${platform} device '${mapping.deviceName}' is already gone; run --apply to clear the mapping.`,
+        );
         return;
       }
       clearDeviceMapping(appDir, platform);

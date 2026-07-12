@@ -34,7 +34,13 @@ import {
   type HarnessBuildResult,
 } from './_shared';
 import { buildIOS, customizeIOS, getIOSBinaryPath, isIOSBinaryValid, trimIOSBuildArtifacts } from './ios';
-import { buildAndroid, customizeAndroid, getAndroidBinaryPath, isAndroidBinaryValid, trimAndroidBuildArtifacts } from './android';
+import {
+  buildAndroid,
+  customizeAndroid,
+  getAndroidBinaryPath,
+  isAndroidBinaryValid,
+  trimAndroidBuildArtifacts,
+} from './android';
 
 export type { HarnessBuildOptions, HarnessBuildResult };
 
@@ -64,7 +70,10 @@ const BUILTIN_NATIVE_DEPS = ['react-native-safe-area-context'];
  * Does NOT build — callers should direct users to run `bunx vitest-mobile bootstrap`.
  */
 export function findHarnessBinary(
-  options: Pick<HarnessBuildOptions, 'platform' | 'reactNativeVersion' | 'nativeModules' | 'packageRoot' | 'projectRoot'>,
+  options: Pick<
+    HarnessBuildOptions,
+    'platform' | 'reactNativeVersion' | 'nativeModules' | 'packageRoot' | 'projectRoot'
+  >,
 ): HarnessBuildResult | null {
   const cacheDir = getCacheDir();
   const cacheKey = computeCacheKey(options);
@@ -183,7 +192,7 @@ export async function ensureHarnessBinary(options: HarnessBuildOptions): Promise
       log.info('Another worker is building the harness binary, waiting...');
       for (let i = 0; i < 600; i++) {
         // up to 10 minutes
-        await new Promise<void>((r) => setTimeout(r, 1000));
+        await new Promise<void>(r => setTimeout(r, 1000));
         if (existsSync(binaryPath) && isBinaryValid(binaryPath, options.platform)) {
           log.info('Harness binary ready (built by another worker).');
           return { binaryPath, bundleId: HARNESS_BUNDLE_ID, cached: true, cacheKey, projectDir };
@@ -343,7 +352,7 @@ export function computeCacheKey(
   options: Pick<HarnessBuildOptions, 'reactNativeVersion' | 'nativeModules' | 'packageRoot' | 'projectRoot'>,
 ): string {
   const sortedModules = options.nativeModules.slice().sort();
-  const moduleVersions = sortedModules.map((mod) => {
+  const moduleVersions = sortedModules.map(mod => {
     const v = readInstalledVersion(options.projectRoot, mod);
     return `${mod}@${v ?? 'unknown'}`;
   });
@@ -598,7 +607,7 @@ function ensureBindReactNativeFactoryCall(contents: string, filename: string): s
  * scaffolded RN template already supports out of the box.
  */
 function hasExpoModule(nativeModules: readonly string[]): boolean {
-  return nativeModules.some((name) => name === 'expo' || name.startsWith('expo-') || name.startsWith('@expo/'));
+  return nativeModules.some(name => name === 'expo' || name.startsWith('expo-') || name.startsWith('@expo/'));
 }
 
 /**
@@ -615,8 +624,8 @@ const NATIVE_MODULE_BABEL_PLUGINS: Record<string, string> = {
 
 function injectBabelPluginsForNativeModules(projectDir: string, nativeModules: string[]): void {
   const pluginsToAdd = nativeModules
-    .filter((mod) => mod in NATIVE_MODULE_BABEL_PLUGINS)
-    .map((mod) => NATIVE_MODULE_BABEL_PLUGINS[mod]);
+    .filter(mod => mod in NATIVE_MODULE_BABEL_PLUGINS)
+    .map(mod => NATIVE_MODULE_BABEL_PLUGINS[mod]);
 
   if (pluginsToAdd.length === 0) return;
 

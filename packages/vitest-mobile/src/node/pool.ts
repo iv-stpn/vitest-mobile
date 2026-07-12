@@ -335,7 +335,10 @@ export class NativePoolWorker implements PoolWorker {
     // reliable on headless emulators, unlike in-process dispatchTouchEvent.
     // Only Android supports this; iOS uses its in-process TouchInjector.
     if (this.options.platform !== 'android') {
-      this.relayToDevice({ type: 'tapResponse', data: { requestId: data.requestId, error: 'host tap only supported on android' } });
+      this.relayToDevice({
+        type: 'tapResponse',
+        data: { requestId: data.requestId, error: 'host tap only supported on android' },
+      });
       return;
     }
     const deviceId = this.runtime.deviceId;
@@ -346,7 +349,10 @@ export class NativePoolWorker implements PoolWorker {
     const cmd = `${getAdbPath()} -s ${deviceId} shell input tap ${Math.round(data.x)} ${Math.round(data.y)}`;
     const result = run(cmd, { timeout: 15000 });
     if (result === null) {
-      this.relayToDevice({ type: 'tapResponse', data: { requestId: data.requestId, error: `adb input tap failed: ${cmd}` } });
+      this.relayToDevice({
+        type: 'tapResponse',
+        data: { requestId: data.requestId, error: `adb input tap failed: ${cmd}` },
+      });
     } else {
       this.relayToDevice({ type: 'tapResponse', data: { requestId: data.requestId } });
     }
@@ -360,7 +366,10 @@ export class NativePoolWorker implements PoolWorker {
     // `input text` joins argv with spaces and decodes %s as space / %% as %,
     // so escape the text accordingly.
     if (this.options.platform !== 'android') {
-      this.relayToDevice({ type: 'typeTextResponse', data: { requestId: data.requestId, error: 'host type only supported on android' } });
+      this.relayToDevice({
+        type: 'typeTextResponse',
+        data: { requestId: data.requestId, error: 'host type only supported on android' },
+      });
       return;
     }
     const deviceId = this.runtime.deviceId;
@@ -372,7 +381,10 @@ export class NativePoolWorker implements PoolWorker {
     const cmd = `${getAdbPath()} -s ${deviceId} shell input text ${JSON.stringify(escaped)}`;
     const result = run(cmd, { timeout: 15000 });
     if (result === null) {
-      this.relayToDevice({ type: 'typeTextResponse', data: { requestId: data.requestId, error: `adb input text failed: ${cmd}` } });
+      this.relayToDevice({
+        type: 'typeTextResponse',
+        data: { requestId: data.requestId, error: `adb input text failed: ${cmd}` },
+      });
     } else {
       this.relayToDevice({ type: 'typeTextResponse', data: { requestId: data.requestId } });
     }
