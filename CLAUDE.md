@@ -189,7 +189,7 @@ runs on pushes to `main` and on pull requests.
 
 ```yaml
 - bun install --frozen-lockfile
-- bun run --filter vitest-mobile build
+- bun run --cwd packages/vitest-mobile build
 - bun run lint
 - bun run check-types
 - bun run format:check
@@ -212,7 +212,7 @@ fast iteration:
 
 # Shared steps (both platforms)
 - bun install --frozen-lockfile
-- bun run --filter vitest-mobile build
+- bun run --cwd packages/vitest-mobile build
 - Compute cache key: bunx vitest-mobile cache-key --platform <platform>
 - Restore cache: ~/.cache/vitest-mobile (+ Android SDK images)
 - Bootstrap: bunx vitest-mobile bootstrap --platform <platform> --headless

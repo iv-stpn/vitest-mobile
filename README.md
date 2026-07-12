@@ -257,7 +257,7 @@ jobs:
           java-version: 17
 
       - run: bun install --frozen-lockfile
-      - run: bun run --filter vitest-mobile build
+      - run: bun run --cwd packages/vitest-mobile build
 
       # Enable KVM for hardware-accelerated Android emulator
       - name: Enable KVM
@@ -294,7 +294,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
 
       - run: bun install --frozen-lockfile
-      - run: bun run --filter vitest-mobile build
+      - run: bun run --cwd packages/vitest-mobile build
       - run: bunx vitest-mobile bootstrap --platform ios --headless
       - run: bunx vitest-mobile bundle --platform ios
       - run: bunx vitest run --project ios

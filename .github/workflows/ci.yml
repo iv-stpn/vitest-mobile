@@ -18,7 +18,7 @@ jobs:
           node-version: 20
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
-      - run: bun run --filter vitest-mobile build
+      - run: bun run --cwd packages/vitest-mobile build
       - run: bun run lint
       - run: bun run check-types
       - run: bun run format:check
@@ -56,7 +56,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Build package
-        run: bun run --filter vitest-mobile build
+        run: bun run --cwd packages/vitest-mobile build
 
       - name: Compute cache key
         id: cache-key
@@ -118,7 +118,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Build package
-        run: bun run --filter vitest-mobile build
+        run: bun run --cwd packages/vitest-mobile build
 
       - name: Compute cache key
         id: cache-key
@@ -175,7 +175,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Build package
-        run: bun run --filter vitest-mobile build
+        run: bun run --cwd packages/vitest-mobile build
 
       - name: Enable KVM
         run: |
@@ -216,7 +216,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Build package
-        run: bun run --filter vitest-mobile build
+        run: bun run --cwd packages/vitest-mobile build
 
       - name: Build, boot & install
         run: bunx vitest-mobile bootstrap --platform ios --headless --force
