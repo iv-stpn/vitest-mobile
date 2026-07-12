@@ -19,8 +19,8 @@
     "test:android": "bun run build && vitest run --project android",
     "test:dev": "bun run build && vitest --project ios",
     "test:dev:android": "bun run build && vitest --project android",
-    "release": "bun run build && bun publish --cwd packages/vitest-mobile --access public",
-    "publish": "bun publish --cwd packages/vitest-mobile --access public"
+    "release": "bun run build && cd packages/vitest-mobile && npm publish --access public",
+    "publish": "cd packages/vitest-mobile && npm publish --access public"
   },
   "overrides": {
     "react": "19.2.7",
