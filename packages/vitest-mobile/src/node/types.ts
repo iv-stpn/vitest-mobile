@@ -115,6 +115,14 @@ export interface MetroOptions {
  */
 export interface NativePluginOptions {
   platform?: Platform;
+  /**
+   * App directory that anchors the `.vitest-mobile/` output dir, Metro
+   * projectRoot, and test discovery. Resolved relative to `process.cwd()`;
+   * defaults to `process.cwd()`. Set this in monorepos where `vitest run`
+   * executes from the workspace root rather than the app package — mirrors the
+   * CLI `--app-dir` flag so the plugin and CLI agree.
+   */
+  appDir?: string;
   port?: number;
   metroPort?: number;
   verbose?: boolean;

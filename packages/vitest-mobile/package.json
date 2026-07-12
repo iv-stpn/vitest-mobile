@@ -17,6 +17,12 @@
       "require": "./dist/runtime/index.cjs",
       "default": "./dist/runtime/index.cjs"
     },
+    "./polyfills": {
+      "types": "./src/runtime/polyfills.ts",
+      "react-native": "./src/runtime/polyfills.ts",
+      "require": "./dist/runtime/polyfills.cjs",
+      "default": "./dist/runtime/polyfills.cjs"
+    },
     "./vitest-shim": {
       "types": "./src/runtime/vitest-shim.ts",
       "react-native": "./src/runtime/vitest-shim.ts",

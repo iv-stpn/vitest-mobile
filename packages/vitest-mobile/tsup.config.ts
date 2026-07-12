@@ -23,6 +23,7 @@ export default defineConfig([
   {
     entry: {
       'runtime/index': 'src/runtime/index.ts',
+      'runtime/polyfills': 'src/runtime/polyfills.ts',
       'runtime/vitest-shim': 'src/runtime/vitest-shim.ts',
       'runtime/test-context': 'src/runtime/test-context.ts',
     },

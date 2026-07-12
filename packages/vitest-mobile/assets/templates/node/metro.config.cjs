@@ -49,39 +49,11 @@ const projectReq = createRequire(path.join(PROJECT_ROOT, 'package.json'));
 const VITEST_MOBILE_ROOT = path.dirname(projectReq.resolve('@iv-stpn/vitest-mobile/package.json'));
 const STUBS_DIR = path.join(VITEST_MOBILE_ROOT, 'src', 'metro', 'vitest-stubs');
 const EMPTY_STUB = path.join(STUBS_DIR, 'empty.js');
-const STUBBED_MODULES = new Set([
-  // Node built-ins
-  'node:module',
-  'node:url',
-  'node:path',
-  'node:fs',
-  'node:fs/promises',
-  'node:vm',
-  'node:async_hooks',
-  'node:perf_hooks',
-  'node:timers',
-  'node:timers/promises',
-  'node:util',
-  'node:assert',
-  'node:v8',
-  'node:console',
-  'node:process',
-  'node:stream',
-  'node:events',
-  'node:buffer',
-  'node:worker_threads',
-  // Vite internals
-  'vite/module-runner',
-  // Optional Vitest environment packages — dynamically imported by the
-  // environments chunk but never reached on device.
-  '@edge-runtime/vm',
-  'happy-dom',
-  'jsdom',
-  // OpenTelemetry API — gated behind traces.enabled (we pass enabled:false),
-  // but `import('@opentelemetry/api')` is a string literal so Metro tries
-  // to resolve it at bundle time.
-  '@opentelemetry/api',
-]);
+// Stub allow-list + harness-pin predicate are shared with applyTestTransforms
+// (src/node/metro-runner.ts) via this single source of truth so they can't drift.
+const { STUBBED_MODULES, isHarnessPinned } = require(
+  path.join(VITEST_MOBILE_ROOT, 'src', 'metro', 'harness-modules.cjs'),
+);
 const STUB_PATHS = (() => {
   const map = new Map();
   for (const name of STUBBED_MODULES) {
@@ -103,31 +75,6 @@ const config = getDefaultConfig(PROJECT_ROOT);
 // below, the default resolver still needs the harness node_modules to
 // be part of the file map for the physical files to be visible.
 config.watchFolders = [...(config.watchFolders || []), HARNESS_DIR];
-
-const HARNESS_PINNED = new Set([
-  'react',
-  'react-native',
-  'react-native-safe-area-context',
-  // Babel runtime helpers — injected by the transformer into every transformed file.
-  '@babel/runtime',
-  // vitest-mobile runtime deps — only installed in the harness tree (via vitest/chai/etc.),
-  // not in the user's workspace root.
-  'chai',
-  'flatted',
-  'pathe',
-  'signalium',
-  '@shopify/restyle',
-  '@vitest/expect',
-  '@vitest/runner',
-  '@vitest/utils',
-]);
-function isHarnessPinned(name) {
-  if (HARNESS_PINNED.has(name)) return true;
-  for (const pkg of HARNESS_PINNED) {
-    if (name === pkg || name.startsWith(pkg + '/')) return true;
-  }
-  return name.startsWith('@react-native/');
-}
 
 const prevResolveRequest = config.resolver && config.resolver.resolveRequest;
 const HARNESS_DIR_PREFIX = HARNESS_DIR + path.sep;
