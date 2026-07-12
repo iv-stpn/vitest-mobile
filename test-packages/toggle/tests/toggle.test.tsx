@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect } from 'vitest';
-import { render, waitFor } from 'vitest-mobile/runtime';
+import { render, waitFor } from '@iv-stpn/vitest-mobile/runtime';
 import { ToggleModule } from '../ToggleModule';
 
 describe('ToggleModule', () => {

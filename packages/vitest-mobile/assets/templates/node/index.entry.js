@@ -7,7 +7,7 @@ const WS_PORT = Number('{{WS_PORT}}');
 const METRO_PORT = Number('{{METRO_PORT}}');
 
 import { AppRegistry } from 'react-native';
-import { createTestHarness } from 'vitest-mobile/runtime';
+import { createTestHarness } from '@iv-stpn/vitest-mobile/runtime';
 
 const HarnessApp = createTestHarness({ port: WS_PORT, metroPort: METRO_PORT });
 AppRegistry.registerComponent(APP_MODULE_NAME, () => HarnessApp);

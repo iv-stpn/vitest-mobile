@@ -42,7 +42,7 @@ export default defineConfig([
       'birpc',
       'flatted',
       'chai',
-      'vitest-mobile/test-context',
+      '@iv-stpn/vitest-mobile/test-context',
       '@shopify/restyle',
       'signalium',
       'signalium/react',

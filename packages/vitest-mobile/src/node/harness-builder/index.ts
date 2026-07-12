@@ -464,7 +464,7 @@ async function customizeProject(projectDir: string, options: HarnessBuildOptions
   const dependencies: Record<string, string> = { ...(pkg.dependencies ?? {}) };
   dependencies['react-native-safe-area-context'] =
     readInstalledVersion(options.projectRoot, 'react-native-safe-area-context') ?? '^5.0.0';
-  dependencies['vitest-mobile'] = `file:${options.packageRoot}`;
+  dependencies['@iv-stpn/vitest-mobile'] = `file:${options.packageRoot}`;
   for (const mod of options.nativeModules) {
     dependencies[mod] = readInstalledVersion(options.projectRoot, mod) ?? '*';
   }

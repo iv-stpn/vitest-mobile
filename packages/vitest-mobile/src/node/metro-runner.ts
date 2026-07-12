@@ -762,7 +762,7 @@ function applyTestTransforms(
 ): ConfigT {
   const { projectRoot, outputDir, harnessProjectDir } = options;
   const pkgRequire = selfRequire();
-  const testContextPath: string = pkgRequire.resolve('vitest-mobile/test-context');
+  const testContextPath: string = pkgRequire.resolve('@iv-stpn/vitest-mobile/test-context');
 
   // Module resolution: redirect vitest → shim, test-context → dist runtime
   const originalResolver = config.resolver.resolveRequest;
@@ -771,11 +771,11 @@ function applyTestTransforms(
     moduleName: string,
     platform: string | null,
   ) => {
-    if (moduleName === 'vitest-mobile/test-context') {
+    if (moduleName === '@iv-stpn/vitest-mobile/test-context') {
       return { type: 'sourceFile', filePath: testContextPath };
     }
     if (moduleName === 'vitest') {
-      return context.resolveRequest(context, 'vitest-mobile/vitest-shim', platform);
+      return context.resolveRequest(context, '@iv-stpn/vitest-mobile/vitest-shim', platform);
     }
     return originalResolver
       ? originalResolver(context, moduleName, platform)
@@ -830,9 +830,9 @@ function applyTestTransforms(
   // Go through our own package's exports map so we don't hard-code a
   // dist-layout-dependent relative path; changing the tsup output shape
   // then only requires updating package.json's `exports`.
-  const testWrapperPluginPath = pkgRequire.resolve('vitest-mobile/babel-plugin');
-  const vitestCompatPluginPath = pkgRequire.resolve('vitest-mobile/vitest-compat-plugin');
-  const inlineAppRootPluginPath = pkgRequire.resolve('vitest-mobile/inline-app-root-plugin');
+  const testWrapperPluginPath = pkgRequire.resolve('@iv-stpn/vitest-mobile/babel-plugin');
+  const vitestCompatPluginPath = pkgRequire.resolve('@iv-stpn/vitest-mobile/vitest-compat-plugin');
+  const inlineAppRootPluginPath = pkgRequire.resolve('@iv-stpn/vitest-mobile/inline-app-root-plugin');
   const extraBabelPluginPaths = resolveBabelPlugins(harnessProjectDir, options.babelPlugins);
   const transformerPath = generateTransformerShim({
     outputDir,

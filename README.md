@@ -44,7 +44,7 @@ Create a `vitest.config.ts` at the root of your project with the `nativePlugin`:
 
 ```typescript
 import { defineConfig } from 'vitest/config';
-import { nativePlugin } from 'vitest-mobile';
+import { nativePlugin } from '@iv-stpn/vitest-mobile';
 
 export default defineConfig({
   test: {
@@ -94,7 +94,7 @@ rendering into real native views:
 ```tsx
 import React from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, render, waitFor } from 'vitest-mobile/runtime';
+import { cleanup, render, waitFor } from '@iv-stpn/vitest-mobile/runtime';
 import { CounterModule } from '../CounterModule';
 
 afterEach(async () => {
@@ -120,7 +120,7 @@ describe('CounterModule', () => {
 ### Rendering
 
 ```typescript
-import { cleanup, pause, render, screenshot, waitFor } from 'vitest-mobile/runtime';
+import { cleanup, pause, render, screenshot, waitFor } from '@iv-stpn/vitest-mobile/runtime';
 ```
 
 | Function                         | Description                                                                         |

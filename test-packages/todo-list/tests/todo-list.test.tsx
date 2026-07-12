@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect } from 'vitest';
-import { render } from 'vitest-mobile/runtime';
+import { render } from '@iv-stpn/vitest-mobile/runtime';
 import { TodoListModule } from '../TodoListModule';
 
 describe('TodoListModule', () => {

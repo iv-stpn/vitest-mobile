@@ -46,7 +46,7 @@ const { getDefaultConfig } = harnessReq('@react-native/metro-config');
 // (`getHarnessVersion(options.packageRoot)`) — the workspace's stubs are
 // guaranteed to match the harness's vitest-mobile version on every run.
 const projectReq = createRequire(path.join(PROJECT_ROOT, 'package.json'));
-const VITEST_MOBILE_ROOT = path.dirname(projectReq.resolve('vitest-mobile/package.json'));
+const VITEST_MOBILE_ROOT = path.dirname(projectReq.resolve('@iv-stpn/vitest-mobile/package.json'));
 const STUBS_DIR = path.join(VITEST_MOBILE_ROOT, 'src', 'metro', 'vitest-stubs');
 const EMPTY_STUB = path.join(STUBS_DIR, 'empty.js');
 const STUBBED_MODULES = new Set([

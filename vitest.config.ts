@@ -1,5 +1,5 @@
 import { defineConfig } from 'vitest/config';
-import { nativePlugin } from 'vitest-mobile';
+import { nativePlugin } from '@iv-stpn/vitest-mobile';
 
 const isRunMode = process.argv.includes('run') || !!process.env.CI;
 
