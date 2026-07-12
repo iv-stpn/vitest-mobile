@@ -25,7 +25,7 @@ WebSocket, and sends test files to run.
 | Tool         | Version      | Notes                                             |
 | ------------ | ------------ | ------------------------------------------------- |
 | Node.js      | >= 18        | LTS recommended                                   |
-| npm          | >= 9         | Ships with Node 18+                               |
+| Bun          | >= 1.1       | Package manager and script runner                 |
 | Xcode        | >= 15        | iOS only — includes `xcrun simctl`                |
 | Android SDK  | API 35       | Android only — includes `adb`, `avdmanager`       |
 | Java         | 17 (Temurin) | Android only                                      |
@@ -37,7 +37,7 @@ WebSocket, and sends test files to run.
 Install the package:
 
 ```bash
-npm install vitest-mobile
+bun install vitest-mobile
 ```
 
 Create a `vitest.config.ts` at the root of your project with the `nativePlugin`:
@@ -72,18 +72,18 @@ Bootstrap the test harness app and run the tests:
 
 ```bash
 # Generate, build, and install the test harness app (~5 min first build)
-npx vitest-mobile bootstrap --platform ios
+bunx vitest-mobile bootstrap --platform ios
 
 # Run tests
-npx vitest run --project ios
+bunx vitest run --project ios
 ```
 
 For Android:
 
 ```bash
 # Generate, build, and install the test harness app (~5 min first build)
-npx vitest-mobile bootstrap --platform android
-npx vitest run --project android
+bunx vitest-mobile bootstrap --platform android
+bunx vitest run --project android
 ```
 
 ## Writing Tests
@@ -175,61 +175,61 @@ await expect.element(screen.getByTestId("count")).toHaveText("1");
 
 ## CLI Reference
 
-All commands are run via `npx vitest-mobile <command>`.
+All commands are run via `bunx vitest-mobile <command>`.
 
 ### Device & App Lifecycle
 
 ```bash
 # Boot a simulator / emulator
-npx vitest-mobile boot-device --platform ios
-npx vitest-mobile boot-device --platform android
+bunx vitest-mobile boot-device --platform ios
+bunx vitest-mobile boot-device --platform android
 
 # Build the native harness binary (~5 min first time, cached after)
-npx vitest-mobile build --platform ios
-npx vitest-mobile build --platform android
+bunx vitest-mobile build --platform ios
+bunx vitest-mobile build --platform android
 
 # Install the built binary onto the device
-npx vitest-mobile install --platform ios
+bunx vitest-mobile install --platform ios
 
 # Build + install in one step
-npx vitest-mobile bootstrap --platform ios
-npx vitest-mobile bootstrap --platform android --headless --api-level 35
+bunx vitest-mobile bootstrap --platform ios
+bunx vitest-mobile bootstrap --platform android --headless --api-level 35
 ```
 
 ### Debugging & Inspection
 
 ```bash
 # Evaluate a JS expression in the running app via CDP
-npx vitest-mobile debug eval "<expression>"
+bunx vitest-mobile debug eval "<expression>"
 
 # Open the JS debugger
-npx vitest-mobile debug open
+bunx vitest-mobile debug open
 
 # Take a screenshot of the simulator
-npx vitest-mobile screenshot --platform ios
+bunx vitest-mobile screenshot --platform ios
 ```
 
 ### Running Tests
 
 ```bash
 # Run all tests on iOS
-npx vitest run --project ios
+bunx vitest run --project ios
 
 # Run all tests on Android
-npx vitest run --project android
+bunx vitest run --project android
 
 # Watch mode (re-runs on file changes)
-npx vitest --project ios
+bunx vitest --project ios
 ```
 
 ### Useful CDP Eval Expressions
 
 ```bash
 # Check test file registry
-npx vitest-mobile debug eval "JSON.stringify(Object.keys(globalThis.__TEST_FILES__ || {}))"
+bunx vitest-mobile debug eval "JSON.stringify(Object.keys(globalThis.__TEST_FILES__ || {}))"
 
 # Check if a test module has the babel plugin's __run wrapper
-npx vitest-mobile debug eval "(function() { var f = globalThis.__TEST_FILES__; var m = f && f['counter/counter.test.tsx'](); return JSON.stringify({ hasRun: typeof m?.__run, keys: Object.keys(m || {}) }); })()"
+bunx vitest-mobile debug eval "(function() { var f = globalThis.__TEST_FILES__; var m = f && f['counter/counter.test.tsx'](); return JSON.stringify({ hasRun: typeof m?.__run, keys: Object.keys(m || {}) }); })()"
 ```
 
 ## CI/CD
@@ -250,13 +250,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
+      - uses: oven-sh/setup-bun@v2
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
 
-      - run: npm ci
+      - run: bun install --frozen-lockfile
+      - run: bun run --filter vitest-mobile build
 
       # Enable KVM for hardware-accelerated Android emulator
       - name: Enable KVM
@@ -267,13 +268,13 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       # Build native binary, boot emulator, install app
-      - run: npx vitest-mobile bootstrap --platform android --headless --api-level 35
+      - run: bunx vitest-mobile bootstrap --platform android --headless --api-level 35
 
       # Pre-build the JS bundle for faster test startup
-      - run: npx vitest-mobile bundle --platform android
+      - run: bunx vitest-mobile bundle --platform android
 
       # Run tests
-      - run: npx vitest run --project android
+      - run: bunx vitest run --project android
 ```
 
 #### iOS
@@ -290,12 +291,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
+      - uses: oven-sh/setup-bun@v2
 
-      - run: npm ci
-      - run: npx vitest-mobile bootstrap --platform ios --headless
-      - run: npx vitest-mobile bundle --platform ios
-      - run: npx vitest run --project ios
+      - run: bun install --frozen-lockfile
+      - run: bun run --filter vitest-mobile build
+      - run: bunx vitest-mobile bootstrap --platform ios --headless
+      - run: bunx vitest-mobile bundle --platform ios
+      - run: bunx vitest run --project ios
 ```
 
 #### Adding Build Caching
@@ -307,7 +309,7 @@ deterministic key:
 ```yaml
 - name: Compute cache key
   id: cache-key
-  run: echo "key=android-e2e-$(npx vitest-mobile cache-key --platform android)" >> "$GITHUB_OUTPUT"
+  run: echo "key=android-e2e-$(bunx vitest-mobile cache-key --platform android)" >> "$GITHUB_OUTPUT"
 
 - uses: actions/cache/restore@v4
   with:
@@ -339,7 +341,7 @@ Module code is not in the bundle. Caused by lazy bundling or missing static
 dependencies. Try clearing the Metro cache:
 
 ```bash
-npx expo start --dev-client --clear
+bunx expo start --dev-client --clear
 ```
 
 ### "Vitest failed to find the current suite"
@@ -366,7 +368,7 @@ xcrun simctl launch booted com.vitest.mobile.harness --initialUrl "http://127.0.
 Rebuild the native binary:
 
 ```bash
-npx vitest-mobile bootstrap --platform ios
+bunx vitest-mobile bootstrap --platform ios
 ```
 
 ## License

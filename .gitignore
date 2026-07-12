@@ -1,9 +1,6 @@
 # Dependencies
 node_modules/
 
-# npm lockfile — this repo uses Bun (bun.lock)
-package-lock.json
-
 # OS
 .DS_Store
 
@@ -30,4 +27,7 @@ test-app/android/
 test-app/build/
 
 # vitest-mobile (auto-generated)
-.vitest-mobile/
+# Note: .vitest-mobile/ is NOT gitignored here — Metro's watchman must be able
+# to crawl it to find the generated entry files. The inner .vitest-mobile/.gitignore
+# (with *) already prevents the generated files from being committed.
+cmdline-tools.zip

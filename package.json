@@ -15,10 +15,10 @@
     "build": "bun run --filter vitest-mobile build",
     "dev": "bun run --filter vitest-mobile dev",
     "test": "vitest run --project ios",
-    "test:ios": "vitest run --project ios",
-    "test:android": "vitest run --project android",
-    "test:dev": "vitest --project ios",
-    "test:dev:android": "vitest --project android",
+    "test:ios": "bun run build && vitest run --project ios",
+    "test:android": "bun run build && vitest run --project android",
+    "test:dev": "bun run build && vitest --project ios",
+    "test:dev:android": "bun run build && vitest --project android",
     "release": "bun run build && bunx changeset publish"
   },
   "overrides": {
@@ -35,7 +35,9 @@
     "globals": "^17.4.0",
     "prettier": "^3.8.1",
     "typescript-eslint": "^8.58.0",
-    "vitest": "^4"
+    "vite": "^8",
+    "vitest": "^4",
+    "vitest-mobile": "workspace:*"
   },
   "version": "1.0.0",
   "dependencies": {

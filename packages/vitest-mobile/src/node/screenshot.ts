@@ -41,8 +41,8 @@ export function detectPlatform(): Platform {
   if (!android && !ios) {
     throw new Error(
       'No running device found. Start one with:\n' +
-        '  npx vitest-mobile boot-device android\n' +
-        '  npx vitest-mobile boot-device ios',
+        '  bunx vitest-mobile boot-device android\n' +
+        '  bunx vitest-mobile boot-device ios',
     );
   }
   return android ? 'android' : 'ios';

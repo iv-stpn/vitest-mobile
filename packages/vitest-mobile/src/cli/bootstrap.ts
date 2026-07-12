@@ -40,7 +40,7 @@ export async function bootstrap(platform: string, options: BootstrapOptions): Pr
   if (!rnVersion) {
     throw new Error(
       'Could not auto-detect React Native version (react-native not found in node_modules).\n' +
-        'Install react-native first:\n  npm install react-native\n\n' +
+        'Install react-native first:\n  bun install react-native\n\n' +
         'Or set reactNativeVersion explicitly in your Vitest config:\n' +
         "  nativePlugin({ reactNativeVersion: '0.86.0' })",
     );
@@ -93,8 +93,7 @@ export async function bootstrap(platform: string, options: BootstrapOptions): Pr
     });
 
     if (!restored) updateStatus(`Booting ${platform} device…`);
-    const deviceId =
-      restored ?? (await ensureDevice(p, { appDir, bundleId }, { headless: true, apiLevel: options.apiLevel }));
+    const deviceId = restored ?? (await ensureDevice(p, { appDir, bundleId }, { headless: true, apiLevel: options.apiLevel }));
 
     const didInstall = installIfNeeded(p, bundleId, result.binaryPath, result.cacheKey, deviceId);
 
@@ -120,13 +119,7 @@ export async function bootstrap(platform: string, options: BootstrapOptions): Pr
 }
 
 /** @returns true if the binary was actually installed, false if skipped. */
-function installIfNeeded(
-  platform: Platform,
-  bundleId: string,
-  binaryPath: string,
-  cacheKey: string,
-  deviceId?: string,
-): boolean {
+function installIfNeeded(platform: Platform, bundleId: string, binaryPath: string, cacheKey: string, deviceId?: string): boolean {
   const installedKey = getInstalledCacheKey(platform, { appDir: process.cwd(), bundleId, deviceId });
   if (installedKey === cacheKey) {
     updateStatus(`Harness binary already installed — skipping`);
