@@ -1,5 +1,5 @@
 {
-  "name": "vitest-mobile",
+  "name": "@iv-stpn/vitest-mobile",
   "version": "0.4.3",
   "description": "Run Vitest component tests inside a real React Native app with native touch synthesis",
   "license": "MIT",
@@ -46,7 +46,7 @@
   "types": "matchers.d.ts",
   "main": "dist/node/index.cjs",
   "bin": {
-    "vitest-mobile": "./bin/vitest-mobile.mjs"
+    "@iv-stpn/vitest-mobile": "./bin/vitest-mobile.mjs"
   },
   "files": [
     "assets/",
@@ -65,7 +65,7 @@
     "test": "vitest run tests/unit tests/integration",
     "test:unit": "vitest run tests/unit",
     "test:e2e": "vitest run --config vitest.config.e2e.ts",
-    "prepublishOnly": "bun run build && cp ../../README.md ."
+    "prepublishOnly": "cp ../../README.md ."
   },
   "keywords": [
     "vitest",

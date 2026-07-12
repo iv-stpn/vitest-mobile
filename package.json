@@ -1,5 +1,5 @@
 {
-  "name": "rn-test-runner",
+  "name": "@iv-stpn/vitest-mobile-monorepo",
   "private": true,
   "type": "module",
   "workspaces": [
@@ -19,7 +19,7 @@
     "test:android": "bun run build && vitest run --project android",
     "test:dev": "bun run build && vitest --project ios",
     "test:dev:android": "bun run build && vitest --project android",
-    "release": "bun run build && bunx changeset publish"
+    "release": "bun run build && cd packages/vitest-mobile && bun publish --access public"
   },
   "overrides": {
     "react": "19.2.7",
@@ -37,7 +37,7 @@
     "typescript-eslint": "^8.58.0",
     "vite": "^8",
     "vitest": "^4",
-    "vitest-mobile": "workspace:*"
+    "@iv-stpn/vitest-mobile": "workspace:*"
   },
   "version": "1.0.0",
   "dependencies": {
