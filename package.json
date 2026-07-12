@@ -12,15 +12,15 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint:all": "bun run lint && bun run check-types && bun run format:check",
-    "build": "bun run --filter vitest-mobile build",
-    "dev": "bun run --filter vitest-mobile dev",
+    "build": "bun run --cwd packages/vitest-mobile build",
+    "dev": "bun run --cwd packages/vitest-mobile dev",
     "test": "vitest run --project ios",
     "test:ios": "bun run build && vitest run --project ios",
     "test:android": "bun run build && vitest run --project android",
     "test:dev": "bun run build && vitest --project ios",
     "test:dev:android": "bun run build && vitest --project android",
-    "release": "bun run build && cd packages/vitest-mobile && bun publish --access public",
-    "publish": "cd packages/vitest-mobile && bun publish --access public"
+    "release": "bun run build && bun publish --cwd packages/vitest-mobile --access public",
+    "publish": "bun publish --cwd packages/vitest-mobile --access public"
   },
   "overrides": {
     "react": "19.2.7",
