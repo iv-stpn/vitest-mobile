@@ -33,7 +33,10 @@ function detectMode(): PoolMode {
 
 /** Vite plugin that wires up the native pool worker. */
 export function nativePlugin(options: NativePluginOptions = {}): Plugin {
-  const appDir = process.cwd();
+  // Resolved relative to process.cwd(); defaults to process.cwd(). Lets monorepos
+  // where `vitest run` executes from the workspace root anchor the harness at the
+  // app package (mirrors the CLI `--app-dir`).
+  const appDir = options.appDir ? resolve(process.cwd(), options.appDir) : process.cwd();
   // InternalPoolOptions starts with default test patterns; `configureVitest`
   // mirrors `include` into testPatterns so downstream consumers (Metro +
   // registry generation) see the same list Vitest uses.

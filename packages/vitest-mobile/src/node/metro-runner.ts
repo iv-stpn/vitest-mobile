@@ -6,7 +6,7 @@
  * is applied programmatically by the pool.
  */
 
-import { resolve, relative, dirname } from 'node:path';
+import { resolve, relative, dirname, sep } from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { mkdirSync, writeFileSync, existsSync, readFileSync, rmSync, statSync } from 'node:fs';
@@ -764,7 +764,48 @@ function applyTestTransforms(
   const pkgRequire = selfRequire();
   const testContextPath: string = pkgRequire.resolve('@iv-stpn/vitest-mobile/test-context');
 
-  // Module resolution: redirect vitest → shim, test-context → dist runtime
+  // The stub allow-list (node/vite/vitest internals) and the harness-pinned set
+  // (react / react-native / @react-native/* / vitest-mobile runtime deps) are
+  // shared with the generated Metro config via src/metro/harness-modules.cjs —
+  // the single source of truth, so the two resolver paths can't drift. Both MUST
+  // be applied HERE (not only in the generated config) because when the consumer
+  // ships its own metro.config.{js,cjs} (every Expo/RN app does), loadMetroConfig
+  // loads that file and skips the generated one — so without this `import
+  // 'node:vm'` from vitest/worker 404s and `@react-native/assets-registry/registry`
+  // (pulled in by image assets) fails to resolve.
+  //
+  // Anchor the lookup at projectRoot (not the harness): a shared cached harness's
+  // `node_modules/vitest-mobile` is a `file:` symlink, so resolving from it can
+  // land paths outside Metro's projectRoot + watchFolders and fail the SHA-1
+  // file-map lookup. The cache key includes the vitest-mobile version, so the
+  // workspace's copy always matches the harness's.
+  const projectReq = createRequire(resolve(projectRoot, 'package.json'));
+  const vitestMobileSrcMetro = resolve(
+    dirname(projectReq.resolve('@iv-stpn/vitest-mobile/package.json')),
+    'src',
+    'metro',
+  );
+  const { STUBBED_MODULES, isHarnessPinned } = projectReq(resolve(vitestMobileSrcMetro, 'harness-modules.cjs')) as {
+    STUBBED_MODULES: string[];
+    isHarnessPinned: (name: string) => boolean;
+  };
+  const stubsDir = resolve(vitestMobileSrcMetro, 'vitest-stubs');
+  const emptyStub = resolve(stubsDir, 'empty.js');
+  const stubPaths = new Map<string, string>();
+  for (const name of STUBBED_MODULES) {
+    const specific = resolve(stubsDir, `${name.replace(':', '/')}.js`);
+    stubPaths.set(name, existsSync(specific) ? specific : emptyStub);
+  }
+
+  // Harness-pinned imports resolve from the harness tree so the bundle uses the
+  // exact copies the prebuilt binary was compiled against (avoids duplicate-module
+  // / identity mismatches in a monorepo). `isHarnessPinned` comes from the shared
+  // module above.
+  const harnessAnchor = resolve(harnessProjectDir, 'package.json');
+  const harnessDirPrefix = harnessProjectDir + sep;
+
+  // Module resolution: redirect vitest → shim, test-context → dist runtime,
+  // node/vite/vitest internals → stubs, harness-pinned packages → harness tree.
   const originalResolver = config.resolver.resolveRequest;
   const resolveRequest: CustomResolver = (
     context: CustomResolutionContext,
@@ -777,20 +818,51 @@ function applyTestTransforms(
     if (moduleName === 'vitest') {
       return context.resolveRequest(context, '@iv-stpn/vitest-mobile/vitest-shim', platform);
     }
+    const stubPath = stubPaths.get(moduleName);
+    if (stubPath) {
+      return { type: 'sourceFile', filePath: stubPath };
+    }
+    if (isHarnessPinned(moduleName)) {
+      // Imports that already originate inside the harness tree keep Node's normal
+      // nested-node_modules walk (RN's own copies of @react-native/* may be nested
+      // due to version conflicts). Imports from outside (consumer code, assets) get
+      // their origin rewritten to the harness so resolution starts there.
+      const originInHarness =
+        typeof context.originModulePath === 'string' && context.originModulePath.startsWith(harnessDirPrefix);
+      if (originInHarness) {
+        return context.resolveRequest(context, moduleName, platform);
+      }
+      return context.resolveRequest(
+        { ...context, originModulePath: harnessAnchor } as CustomResolutionContext,
+        moduleName,
+        platform,
+      );
+    }
     return originalResolver
       ? originalResolver(context, moduleName, platform)
       : context.resolveRequest(context, moduleName, platform);
   };
 
-  // Rewrite /index.bundle → /.vitest-mobile/index.bundle so the entry point
-  // lives in .vitest-mobile/ instead of polluting the project root.
-  // This runs on the incoming URL before Metro parses it, so the entry file
-  // resolves as .vitest-mobile/index relative to projectRoot.
-  // We intentionally do NOT use unstable_serverRoot because it also changes
-  // the base for lazy bundle URL generation, breaking paths to modules
+  // Rewrite /index.bundle → /<outputDir>/index.bundle so the entry point lives
+  // in .vitest-mobile/ instead of polluting the project root. This runs on the
+  // incoming URL before Metro parses it.
+  //
+  // Metro resolves the entry file from the URL path relative to its *server root*
+  // — `config.server.unstable_serverRoot ?? config.projectRoot` (see
+  // Server._getServerRootDir / _getEntryPointAbsolutePath) — NOT projectRoot.
+  // Expo's metro config deliberately sets unstable_serverRoot to the monorepo
+  // root ("Moves the server root down to the monorepo root" in @expo/metro-config),
+  // so a path computed relative to projectRoot would resolve against the wrong
+  // base and 404 (./.vitest-mobile/index from the monorepo root). Anchor the
+  // rewrite at the effective server root so the URL entry resolves correctly
+  // whether or not unstable_serverRoot is set.
+  //
+  // We still do NOT override unstable_serverRoot itself: changing it would also
+  // move the base for lazy bundle URL generation, breaking paths to modules
   // outside the server root directory.
   const origRewrite = config.server.rewriteRequestUrl;
-  const outputPathFromRoot = relative(projectRoot, outputDir).split('\\').join('/');
+  const serverRoot = config.server.unstable_serverRoot ?? projectRoot;
+  const outputPathFromRoot = relative(serverRoot, outputDir).split('\\').join('/');
   const rewriteRequestUrl = (url: string) => {
     // Match /index. in both path-only and full URL forms
     const rewritten = url.replace(/\/index\./, `/${outputPathFromRoot}/index.`);
@@ -820,6 +892,27 @@ function applyTestTransforms(
 
   const watchFolders = [...config.watchFolders];
   if (!watchFolders.includes(options.outputDir)) watchFolders.push(options.outputDir);
+  // Include the harness project tree in Metro's watched file map. Metro's
+  // resolver only considers files inside projectRoot + watchFolders to "exist"
+  // (fileSystemLookup / SHA-1 file map), and harness-anchored resolutions
+  // (transformer shim, metro-runtime polyfills, @react-native/* pins) point at
+  // files in the harness tree. The generated metro config adds this; replicate
+  // it here so it also applies when the consumer ships its own metro.config —
+  // otherwise bundling fails with "Failed to get the SHA-1 for: …/harness/…".
+  if (!watchFolders.includes(harnessProjectDir)) watchFolders.push(harnessProjectDir);
+
+  // Prepend our global polyfills (FormData, …) to Metro's polyfill list so they
+  // run as plain scripts before the module system and before
+  // getModulesRunBeforeMainModule — app dependency graphs reference these
+  // globals at module-top during pre-main evaluation, which throws before the
+  // harness entry (and thus the runtime's own polyfills) ever runs. Anchored at
+  // projectRoot's vitest-mobile, same rationale as the stubs dir above.
+  const globalPolyfillPath = resolve(vitestMobileSrcMetro, 'global-polyfills.js');
+  const origGetPolyfills = config.serializer.getPolyfills;
+  const getPolyfills = (opts: Parameters<NonNullable<ConfigT['serializer']['getPolyfills']>>[0]): readonly string[] => [
+    ...(origGetPolyfills ? origGetPolyfills(opts) : []),
+    globalPolyfillPath,
+  ];
 
   // Emit a harness-anchored transformer shim into the output dir and point
   // Metro's babelTransformerPath at it. See generateTransformerShim for the
@@ -875,6 +968,10 @@ function applyTestTransforms(
       babelTransformerPath: transformerPath,
       // enable require.context() in the app bundle (test-context registry)
       unstable_allowRequireContext: true,
+    },
+    serializer: {
+      ...config.serializer,
+      getPolyfills,
     },
     server: {
       ...config.server,

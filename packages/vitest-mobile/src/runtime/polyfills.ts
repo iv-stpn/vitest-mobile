@@ -121,6 +121,52 @@ export function ensureRuntimePolyfills(): void {
   ensureStructuredClonePolyfill();
   ensureDOMExceptionPolyfill();
 
+  // React Native normally installs `FormData` as a global via InitializeCore's
+  // setUpXHR, but in the harness runtime it isn't present, and dependencies in
+  // a real app's import graph (networking/upload libs, tRPC, etc.) reference
+  // `FormData` at module-top — e.g. `class X extends FormData`, `instanceof
+  // FormData` — which throws "Property 'FormData' doesn't exist" before any
+  // test runs. Provide a minimal spec-shaped implementation.
+  if (typeof (g as { FormData?: unknown }).FormData === 'undefined') {
+    (g as { FormData?: unknown }).FormData = class FormData {
+      private _entries: Array<[string, unknown]> = [];
+      append(name: string, value: unknown) {
+        this._entries.push([name, value]);
+      }
+      set(name: string, value: unknown) {
+        this._entries = this._entries.filter(([n]) => n !== name);
+        this._entries.push([name, value]);
+      }
+      get(name: string) {
+        return this._entries.find(([n]) => n === name)?.[1] ?? null;
+      }
+      getAll(name: string) {
+        return this._entries.filter(([n]) => n === name).map(([, v]) => v);
+      }
+      has(name: string) {
+        return this._entries.some(([n]) => n === name);
+      }
+      delete(name: string) {
+        this._entries = this._entries.filter(([n]) => n !== name);
+      }
+      forEach(cb: (value: unknown, name: string, parent: unknown) => void) {
+        for (const [n, v] of this._entries) cb(v, n, this);
+      }
+      entries() {
+        return this._entries[Symbol.iterator]();
+      }
+      keys() {
+        return this._entries.map(([n]) => n)[Symbol.iterator]();
+      }
+      values() {
+        return this._entries.map(([, v]) => v)[Symbol.iterator]();
+      }
+      [Symbol.iterator]() {
+        return this._entries[Symbol.iterator]();
+      }
+    };
+  }
+
   // Chai 6.x uses EventTarget for plugin events. Hermes doesn't provide it.
   if (typeof EventTarget === 'undefined') {
     g.Event = class Event {

@@ -6,6 +6,13 @@ const APP_MODULE_NAME = '{{APP_MODULE_NAME}}';
 const WS_PORT = Number('{{WS_PORT}}');
 const METRO_PORT = Number('{{METRO_PORT}}');
 
+// Install runtime global polyfills (FormData, process, Event/EventTarget, …)
+// FIRST. Babel hoists import side-effects in textual order, so keeping this as
+// the first import guarantees the globals exist before the runtime graph and
+// any test module's import graph evaluate — some app dependencies reference
+// these globals at module-top, which would otherwise throw during the initial
+// (pre-harness) bundle execution.
+import '@iv-stpn/vitest-mobile/polyfills';
 import { AppRegistry } from 'react-native';
 import { createTestHarness } from '@iv-stpn/vitest-mobile/runtime';
 
