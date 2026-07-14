@@ -19,7 +19,7 @@
     "test:android": "bun run build && vitest run --project android",
     "test:dev": "bun run build && vitest --project ios",
     "test:dev:android": "bun run build && vitest --project android",
-    "release": "bun run build && cd packages/vitest-mobile && npm publish --access public",
+    "release": "bun run build && changeset publish",
     "publish": "cd packages/vitest-mobile && npm publish --access public"
   },
   "overrides": {
