@@ -1,5 +1,109 @@
 # vitest-mobile
 
+## 0.5.0
+
+### Minor Changes
+
+- d04d58d: feat(runtime): host-side `adb shell input` bridge for reliable Android headless tap and type
+
+  Synthesized `MotionEvent`s dispatched in-process (`dispatchTouchEvent`) bypass the `InputDispatcher`'s touch-session setup, causing `onPress` to fire only ~70% of the time on Android headless emulators. `view.text.replace()` on a controlled `TextInput` was reverted by React Native's controlled-component logic before `onChangeText` reached JS. Both failures were non-deterministic and traced to Fabric's async VSYNC-gated mount cycle.
+
+  **How it works**
+
+  A new device→pool RPC adds two request/response round-trips over the existing WebSocket (`tapRequest`/`tapResponse` and `typeTextRequest`/`typeTextResponse`). The pool handles each by running the corresponding `adb shell` command:
+
+  - `adb shell input tap X Y` — routes through the full `InputManager` pipeline, identical to a real finger touch, reliably received by RN's `ReactViewGroup.onTouchEvent`
+  - `adb shell input text <text>` — real IME input that RN treats as user typing; `onChangeText` fires reliably without the controlled-component revert
+
+  **`resolveStable()`**
+
+  Fabric applies mount/unmount transactions asynchronously (VSYNC-gated). Right after a `render()`, the view tree can still contain a stale view from the previous test with the same `testID` at a wrong position. `resolveStable()` in `Locator` waits for the element's frame (`x, y, width, height`) to match across two consecutive queries before proceeding, ensuring the tap always hits the intended target.
+
+  **Compatibility**
+
+  The host-bridge path is Android-only (`Platform.OS === 'android'`). iOS keeps its in-process `TouchInjector` unchanged.
+
+  **Result:** 19/19 tests pass in 6 consecutive runs on a headless arm64 Android emulator (was 1–17/19, non-deterministic).
+
+- 06d76d1: feat: support Expo + monorepo apps that ship their own metro.config
+
+  When the consumer app ships its own `metro.config.{js,cjs}` (every Expo/RN app, and required in Nx/pnpm monorepos), `loadMetroConfig` loads that file and skips the generated config — so the node-builtin stubs, harness module pinning, harness `watchFolders`, and global polyfills never applied, and the harness failed to boot.
+
+  **`nativePlugin({ appDir })` option** — Resolved relative to `process.cwd()`, defaults to `process.cwd()`. Mirrors the CLI `--app-dir` so the harness anchors at the app package when `vitest run` executes from the workspace root.
+
+  **`applyTestTransforms` now applies the full resolver contract** — Previously only the generated Metro config injected the node/vite/vitest stub resolver, the harness pinning (`react`/`react-native`/`@react-native/*` plus this package's expanded runtime-dep set), and the harness tree in `watchFolders`. These are now also applied in `applyTestTransforms` so they take effect when the consumer ships its own config.
+
+  **Server-root-anchored bundle URL rewrite** — Anchors the `/index.bundle` rewrite at the effective server root (`server.unstable_serverRoot ?? projectRoot`). Expo sets `unstable_serverRoot` to the monorepo root, so a projectRoot-relative path 404s.
+
+  **Global polyfills** — `FormData`, `setImmediate`, `requestAnimationFrame`, etc. installed via a Metro `getPolyfills` script so they exist before pre-main module evaluation, plus a matching runtime `FormData` shim. Real app dependency graphs reference these globals at module-top.
+
+  **Single source of truth** — `src/metro/harness-modules.cjs` exports the stub allow-list and harness-pin predicate, consumed by both the generated config and `applyTestTransforms` so the two resolver paths can't drift.
+
+### Patch Changes
+
+- d04d58d: fix(android): provision arm64-compatible AVDs on Apple Silicon, fix partition size and app launch
+
+  QEMU2 cannot emulate a foreign CPU architecture, so running Android tests on Apple Silicon (aarch64) Macs previously failed with "Avd's CPU Architecture 'x86_64' is not supported by the QEMU2 emulator on aarch64 host."
+
+  - Auto-detect host CPU arch (`os.arch()`): default to `arm64-v8a` + `google_apis` system image on arm64 hosts, `x86_64` + `default` elsewhere
+  - Expand AVD `disk.dataPartition.size` to 2 GB (default 512 MB caused out-of-space errors during harness installation)
+  - Resolve the launcher component name dynamically via `cmd package resolve-activity --brief` instead of hardcoding, fixing `adb shell monkey` failures (exit 251) on physical-key-less arm64 emulators
+  - Switch app launch from `adb shell monkey` to `adb shell am start -n <component>` with monkey as fallback
+  - Filter AVD picker to only show AVDs whose `abi.type` matches the host architecture
+
+- d04d58d: fix(android): triple-post `flushUIQueue` avoids headless Choreographer deadlock; `typeIntoView` sets text directly
+
+  **`flushUIQueue`** — The previous `Choreographer.postFrameCallback` implementation waited for the next VSYNC frame. In headless mode (`-no-window`) the virtual display does not fire VSYNC while the UI is idle, so the callback never fired and any test that called `render()` or `cleanup()` deadlocked. Replaced with a triple `mainHandler.post` (mirrors iOS's triple `dispatch_async` pattern) that drains pending UI work without depending on VSYNC. A synchronous `measure()+layout()` pass is also driven here to ensure views have correct frames for coordinate queries.
+
+  **`typeIntoView`** — The previous implementation dispatched synthesized `DOWN`/`UP` `MotionEvent`s to focus the target `EditText`, then replaced `currentFocus.text`. On Android headless the synthetic focus rarely worked, leaving `currentFocus` null and silently dropping the text. Replaced with `view.requestFocus()` + `view.text.replace()` directly on the target view resolved by `nativeId`. Mutating the `Editable` fires React Native's `TextWatcher` → `onChangeText`, so controlled components update correctly.
+
+- bcaabd0: fix: don't delete the other platform's native dir during artifact trimming
+
+  `trimAndroidBuildArtifacts` was deleting `projectDir/ios` and `trimIOSBuildArtifacts` was deleting `projectDir/android`. Because the scaffold is shared between platforms, this left the `.vitest-mobile-customized` marker in place while removing the native project the other build needed — causing the subsequent build to skip scaffolding and crash.
+
+  Both trim functions now only remove their own platform's intermediates. The `isProjectReady` check in `ensureHarnessBinary` also now verifies that the native dir for the target platform exists alongside the marker, so a partially-trimmed cache entry correctly triggers a re-scaffold.
+
+  Also fixes `typeText` on native inputs: after `typeIntoView`, the resulting `onChangeText`/`setState` re-render isn't guaranteed to have committed before the promise resolves. We now drain the UI queue and yield to JS (matching the host-bridge path) so that a subsequent `tap()` whose handler closes over the input value sees the post-type state.
+
+- 3fbfa51: Fix all internal imports to use the scoped package name `@iv-stpn/vitest-mobile` instead of the bare `vitest-mobile` specifier, which was unresolvable at bundle and config load time.
+- 124df29: fix(types): add missing type devDependencies and fix implicit any errors
+
+  Add `@babel/core`, `@babel/types`, `@types/babel__core`, `@types/chai`,
+  `metro`, `metro-config`, and `metro-resolver` as devDependencies so
+  `tsc --noEmit` can resolve all type declarations.
+
+  Fix two implicit `any` errors in `metro-runner.ts`:
+  - Use `NonNullable<EnhanceMiddleware>` so TypeScript can contextually type
+    the `middleware` / `metroServer` parameters (the `| undefined` union
+    blocked inference).
+  - Remove stale object destructuring from `metro.runServer()` — metro 0.81
+    returns `HttpServer | HttpsServer` directly, not `{ httpServer }`.
+
+- d04d58d: fix(metro): expand HARNESS_PINNED, add disk fallback resolver, disable watchman for output dir, add noop toolLauncher
+
+  Four bundler fixes that unblock Android (and iOS) test runs:
+
+  **HARNESS_PINNED expansion** — Added `@babel/runtime`, `chai`, `flatted`, `pathe`, `signalium`, `@shopify/restyle`, `@vitest/expect`, `@vitest/runner`, `@vitest/utils` to the set of packages always resolved from the harness tree. Without this, Metro would fail with `MODULE_NOT_FOUND` for packages only installed under the harness node_modules.
+
+  **Disk fallback resolver** — The generated entry file (`.vitest-mobile/index.<platform>.js`) lives in a gitignored output directory. Watchman respects `.gitignore` and excludes those files from its file map, causing Metro's resolver to report "None of these files exist". A narrow `resolveOnDisk()` fallback checks the filesystem directly for paths under `.vitest-mobile/`, bypassing the file map only for that directory.
+
+  **`useWatchman: false`** — Metro also needs the entry file in the file map to compute its SHA-1 for caching. Switching to the Node fs crawler (which does not respect `.gitignore`) includes the output dir in the file map. HMR and file watching still work via `fs.watch`.
+
+  **Noop toolLauncher** — `createDevMiddleware` throws "DefaultToolLauncher must be mocked or overridden in tests" when `NODE_ENV=test`. Passing a no-op implementation avoids this without affecting real debug functionality.
+
+- d04d58d: fix(pool): force `isolate: false` to prevent per-file worker teardown
+
+  Vitest defaults `cfg.isolate` to `true`. The previous guard
+  (`if (cfg.isolate === undefined)`) never fired because Vitest had already set
+  the field, causing each test file to get its own worker cycle:
+  `run(file) → worker.stop() → run(next file)`. `worker.stop()` tears down Metro
+  and terminates the device WebSocket, so every file after the first arrived with
+  no connection and the run stopped early — **only 1 of 4 test files ran**.
+
+  The native pool requires `isolate: false` — there is a single RN JS VM per
+  platform that persists across all files. The fix forces `cfg.isolate = false`
+  unconditionally and emits a warning if the user had explicitly set it to `true`.
+
 ## 0.4.3
 
 ### Patch Changes
