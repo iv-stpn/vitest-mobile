@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { waitFor } from '../../src/runtime/retry';
+import { poll, waitFor } from '../../src/runtime/retry';
 
 describe('waitFor', () => {
   it('resolves immediately when fn succeeds on first call', async () => {
@@ -89,5 +89,67 @@ describe('waitFor', () => {
     await expect(waitFor(() => false)).resolves.toBe(false);
     await expect(waitFor(() => null)).resolves.toBe(null);
     await expect(waitFor(() => '')).resolves.toBe('');
+  });
+
+  it('still attempts fn exactly once with a zero timeout', async () => {
+    const fn = vi.fn().mockReturnValue('ok');
+    await expect(waitFor(fn, { timeout: 0 })).resolves.toBe('ok');
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it('throws the fn error (not a bare undefined) when it fails under a zero timeout', async () => {
+    await expect(
+      waitFor(
+        () => {
+          throw new Error('boom');
+        },
+        { timeout: 0 },
+      ),
+    ).rejects.toThrow('boom');
+  });
+
+  it('throws a descriptive timeout error when fn never runs (negative timeout)', async () => {
+    // A negative timeout makes the deadline already elapsed; the do/while still
+    // runs the body once, so a passing fn resolves rather than throwing undefined.
+    const fn = vi.fn().mockReturnValue('ok');
+    await expect(waitFor(fn, { timeout: -1 })).resolves.toBe('ok');
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('poll', () => {
+  it('resolves when fn succeeds on first call', async () => {
+    const fn = vi.fn().mockResolvedValue(undefined);
+    await expect(poll(fn)).resolves.toBeUndefined();
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries when fn throws and resolves on eventual success', async () => {
+    let calls = 0;
+    await poll(
+      async () => {
+        calls += 1;
+        if (calls < 3) throw new Error('not yet');
+      },
+      { interval: 10 },
+    );
+    expect(calls).toBe(3);
+  });
+
+  it('throws the fn error (not a bare undefined) when it fails under a zero timeout', async () => {
+    await expect(
+      poll(
+        async () => {
+          throw new Error('boom');
+        },
+        { timeout: 0 },
+      ),
+    ).rejects.toThrow('boom');
+  });
+
+  it('still attempts fn exactly once with a zero timeout', async () => {
+    const fn = vi.fn().mockResolvedValue(undefined);
+    await expect(poll(fn, { timeout: 0 })).resolves.toBeUndefined();
+    expect(fn).toHaveBeenCalledTimes(1);
   });
 });

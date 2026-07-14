@@ -29,7 +29,9 @@ export async function waitFor<T>(fn: () => T | Promise<T>, options: RetryOptions
   let lastError: unknown;
   let attempts = 0;
 
-  while (Date.now() < deadline) {
+  // Always attempt at least once, even with a zero/negative timeout, so the
+  // deadline check can't skip the body and leave us throwing a bare `undefined`.
+  do {
     attempts++;
     try {
       const result = await fn();
@@ -46,9 +48,11 @@ export async function waitFor<T>(fn: () => T | Promise<T>, options: RetryOptions
     if (interval > 0) {
       await new Promise(r => setTimeout(r, interval));
     }
-  }
+  } while (Date.now() < deadline);
 
-  throw lastError;
+  throw lastError !== undefined
+    ? lastError
+    : new Error(`waitFor timed out after ${timeout}ms without an attempt succeeding`);
 }
 
 export async function poll(fn: () => Promise<void>, opts: { timeout?: number; interval?: number } = {}): Promise<void> {
@@ -56,7 +60,9 @@ export async function poll(fn: () => Promise<void>, opts: { timeout?: number; in
   const interval = opts.interval ?? DEFAULT_INTERVAL;
   const deadline = Date.now() + timeout;
   let lastError: unknown;
-  while (Date.now() < deadline) {
+  // Always attempt at least once, even with a zero/negative timeout, so the
+  // deadline check can't skip the body and leave us throwing a bare `undefined`.
+  do {
     try {
       await fn();
       return;
@@ -67,6 +73,8 @@ export async function poll(fn: () => Promise<void>, opts: { timeout?: number; in
     if (interval > 0) {
       await new Promise(r => setTimeout(r, interval));
     }
-  }
-  throw lastError;
+  } while (Date.now() < deadline);
+  throw lastError !== undefined
+    ? lastError
+    : new Error(`poll timed out after ${timeout}ms without an attempt succeeding`);
 }
